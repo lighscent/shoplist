@@ -38,7 +38,7 @@
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
       <p class="text-xs text-gray-400 mb-3">Pseudo</p>
       <form id="pseudoForm" action="/profile/pseudo" method="POST" class="flex gap-2">
-        <input type="text" id="pseudoInput" name="pseudo" value="<%= user.pseudo %>" required minlength="2"
+        <input type="text" id="pseudoInput" name="pseudo" value="<%= user.pseudo %>" required minlength="2" autocomplete="nickname"
           class="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
         <button type="submit"
           class="bg-blue-500 text-white font-medium px-4 rounded-xl text-sm hover:bg-blue-600 active:bg-blue-700 transition-colors shrink-0">
@@ -52,9 +52,9 @@
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
       <p class="text-xs text-gray-400 mb-3">Mot de passe</p>
       <form id="passwordForm" action="/profile/password" method="POST" class="space-y-2">
-        <input type="password" name="currentPassword" placeholder="Mot de passe actuel" required
+        <input type="password" name="currentPassword" placeholder="Mot de passe actuel" required autocomplete="current-password"
           class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-        <input type="password" name="newPassword" placeholder="Nouveau mot de passe" required minlength="4"
+        <input type="password" name="newPassword" placeholder="Nouveau mot de passe" required minlength="4" autocomplete="new-password"
           class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
         <button type="submit"
           class="w-full bg-blue-500 text-white font-medium py-2.5 rounded-xl text-sm hover:bg-blue-600 active:bg-blue-700 transition-colors">
