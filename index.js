@@ -116,6 +116,7 @@ app.use((req, res, next) => {
 
 app.use('/', require('./routes/auth'));
 app.use('/', require('./routes/lists'));
+app.use('/', require('./routes/family'));
 app.use('/api', require('./routes/api'));
 
 app.use((req, res) => {

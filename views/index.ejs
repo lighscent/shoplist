@@ -66,7 +66,9 @@
             <a href="/list/<%= list.id %>" data-name="<%= list.name.toLowerCase() %>"
               class="list-card flex items-center bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:border-blue-200 transition-colors">
               <div class="flex-1 min-w-0">
-                <p class="font-medium text-gray-800 text-sm truncate"><%= list.name %></p>
+                <p class="font-medium text-gray-800 text-sm truncate"><%= list.name %>
+                  <% if (locals.user && list.created_by !== user.email && !list.can_edit) { %><span class="text-xs font-normal px-2 py-0.5 rounded-full" style="background:#f3f4f6;color:#6b7280;">Lecture seule</span><% } %>
+                </p>
                 <p class="text-xs text-gray-400 mt-1"><%= done %>/<%= total %> article(s) coché(s)</p>
                 <div style="height:6px;background:#f3f4f6;border-radius:9999px;margin-top:6px;overflow:hidden;">
                   <div style="height:100%;width:<%= pct %>%;background:#3b82f6;border-radius:9999px;"></div>

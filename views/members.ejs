@@ -22,18 +22,29 @@
       <h1 class="text-xl font-bold text-gray-800 truncate"><%= list.name %></h1>
     </div>
 
+    <% if (canInvite) { %>
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
       <h2 class="text-sm font-semibold text-gray-700 mb-1">Partager la liste</h2>
-      <p class="text-xs text-gray-400 mb-3">Le lien expire apres la premiere utilisation.</p>
-      <div class="flex gap-2">
-        <input type="text" id="shareLink" readonly
-          class="flex-1 min-w-0 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-500 focus:outline-none">
-        <button onclick="copyLink()" id="copyBtn"
-          class="shrink-0 bg-blue-500 text-white font-medium px-4 rounded-xl text-sm hover:bg-blue-600 active:bg-blue-700 transition-colors">
-          Copier
-        </button>
+      <p class="text-xs text-gray-400 mb-3">Lien valide 30 min, usage unique.</p>
+      <div id="shareBox">
+        <% if (inviteUrl) { %>
+          <div class="flex gap-2">
+            <input type="text" id="shareLink" readonly value="<%= inviteUrl %>"
+              class="flex-1 min-w-0 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-500 focus:outline-none">
+            <button onclick="copyLink()" id="copyBtn"
+              class="shrink-0 bg-blue-500 text-white font-medium px-4 rounded-xl text-sm hover:bg-blue-600 active:bg-blue-700 transition-colors">
+              Copier
+            </button>
+          </div>
+        <% } else { %>
+          <button onclick="genLink()" id="genBtn"
+            class="w-full bg-blue-500 text-white font-medium py-2.5 rounded-xl text-sm hover:bg-blue-600 active:bg-blue-700 transition-colors">
+            Générer un lien
+          </button>
+        <% } %>
       </div>
     </div>
+    <% } %>
 
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
       <h2 id="membersTitle" class="text-sm font-semibold text-gray-700 mb-3">Membres (<%= members.length %>)</h2>
@@ -49,8 +60,11 @@
             </div>
             <% if (m.email === list.created_by) { %>
               <span class="text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ml-2" style="background:#fef3c7;color:#92400e;">Proprietaire</span>
-            <% } else if (locals.user && list.created_by === user.email) { %>
+            <% } else { %>
+              <% if (!m.canEdit) { %><span class="text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ml-2" style="background:#f3f4f6;color:#6b7280;">Lecteur</span><% } %>
+              <% if (locals.user && list.created_by === user.email) { %>
               <button onclick="removeMember('<%= m.email %>')" class="text-red-400 hover:text-red-600 text-sm font-medium shrink-0 ml-2">Retirer</button>
+              <% } %>
             <% } %>
           </div>
         <% }) %>
@@ -70,7 +84,6 @@
 
   <script>
     const listId = '<%= list.id %>';
-    const shareToken = '<%= list.share_token %>';
 
     function showConfirm(msg) {
       return new Promise(resolve => {
@@ -81,7 +94,18 @@
       });
     }
 
-    document.getElementById('shareLink').value = window.location.origin + '/join/' + shareToken;
+    async function genLink() {
+      const res = await fetch('/api/list/' + listId + '/invite', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.token) return;
+      const box = document.getElementById('shareBox');
+      box.innerHTML = '<div class="flex gap-2">'
+        + '<input type="text" id="shareLink" readonly value="' + window.location.origin + '/join/' + data.token + '"'
+        + ' class="flex-1 min-w-0 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-500 focus:outline-none">'
+        + '<button onclick="copyLink()" id="copyBtn"'
+        + ' class="shrink-0 bg-blue-500 text-white font-medium px-4 rounded-xl text-sm hover:bg-blue-600 active:bg-blue-700 transition-colors">Copier</button>'
+        + '</div>';
+    }
 
     async function copyLink() {
       const input = document.getElementById('shareLink');

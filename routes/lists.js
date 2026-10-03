@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const store = require('../store');
+const { baseUrl } = require('../lib/urls');
 const { requireAuth, requirePseudo } = require('../middleware/auth');
 
 const router = Router();
@@ -29,8 +30,13 @@ router.post('/lists', requireAuth, requirePseudo, (req, res) => {
 });
 
 router.get('/join/:token', (req, res) => {
-  const list = store.getListByShareToken(req.params.token);
-  if (!list) return res.status(404).render('404');
+  const list = store.peekListInvite(req.params.token);
+  if (!list) {
+    const stale = store.getListByShareToken(req.params.token);
+    return res.status(stale ? 410 : 404).render('404', stale
+      ? { code: 410, msg: 'Ce lien d\u2019invitation a expir\u00e9 (30 min, usage unique). Demande un nouveau lien.' }
+      : {});
+  }
   if (!res.locals.user) {
     req.session.afterLogin = req.originalUrl;
     return res.redirect('/login');
@@ -39,8 +45,8 @@ router.get('/join/:token', (req, res) => {
     req.session.afterLogin = req.originalUrl;
     return res.redirect('/choose-pseudo');
   }
+  store.consumeListInvite(req.params.token);
   store.addMember(list.id, req.session.userEmail);
-  store.rotateShareToken(list.id);
   res.redirect('/list/' + list.id);
 });
 
@@ -53,14 +59,16 @@ router.get('/list', (req, res) => {
 router.get('/list/:id', requireAuth, (req, res) => {
   const list = store.getList(req.params.id);
   if (!list) return res.status(404).render('404');
-  res.render('list', { list, user: res.locals.user });
+  res.render('list', { list, user: res.locals.user, canEdit: store.canEditList(req.params.id, req.session.userEmail) });
 });
 
 router.get('/list/:id/members', requireAuth, (req, res) => {
   const list = store.getList(req.params.id);
   if (!list) return res.status(404).render('404');
   const members = store.getMembers(req.params.id);
-  res.render('members', { list, user: res.locals.user, members });
+  const canInvite = store.canEditList(req.params.id, req.session.userEmail);
+  const token = store.getValidListInvite(req.params.id);
+  res.render('members', { list, user: res.locals.user, members, canInvite, inviteUrl: token ? baseUrl(req) + '/join/' + token : null });
 });
 
 module.exports = router;

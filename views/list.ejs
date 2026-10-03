@@ -38,6 +38,10 @@
       </a>
     </div>
 
+    <% if (!canEdit) { %>
+      <p class="text-xs text-center font-medium mb-4 px-3 py-2 rounded-xl" style="background:#f3f4f6;color:#6b7280;">Lecture seule — tu peux voir mais pas modifier</p>
+    <% } %>
+
     <div class="mb-6">
       <% const total0 = list.items.length; const done0 = list.items.filter(i => i.checked).length; const pct0 = total0 > 0 ? Math.round(done0 / total0 * 100) : 0; %>
       <p id="progressText" class="text-xs text-gray-400 mb-1.5"><% if (total0 > 0) { %><%= done0 %> / <%= total0 %> sélectionnés (<%= pct0 %> %)<% } %></p>
@@ -46,6 +50,7 @@
       </div>
     </div>
 
+    <% if (canEdit) { %>
     <form id="addForm" class="flex gap-2 mb-6">
       <input type="number" name="quantity" min="1" value="1"
         class="px-3 bg-white border border-gray-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shrink-0" style="width:56px;height:48px;">
@@ -59,6 +64,7 @@
         </svg>
       </button>
     </form>
+    <% } %>
 
     <div id="itemsList" class="space-y-2">
       <% const sorted = [...list.items].sort((a, b) => (a.checked ? 1 : 0) - (b.checked ? 1 : 0)); %>
@@ -68,12 +74,12 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z" />
           </svg>
           <p class="text-gray-800 font-medium text-sm mb-1">Liste vide</p>
-          <p class="text-gray-400 text-xs">Ajoute ton premier article ci-dessus</p>
+          <p class="text-gray-400 text-xs"><% if (canEdit) { %>Ajoute ton premier article ci-dessus<% } else { %>Rien à afficher pour l'instant<% } %></p>
         </div>
       <% } %>
       <% sorted.forEach(item => { %>
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-2 transition-opacity <%= item.checked ? 'opacity-50' : '' %>" data-id="<%= item.id %>">
-          <input type="checkbox" <%= item.checked ? 'checked' : '' %>
+          <input type="checkbox" <%= item.checked ? 'checked' : '' %> <%= canEdit ? '' : 'disabled' %>
             onchange="toggleItem('<%= item.id %>')"
             class="rounded border-gray-300 text-blue-500 focus:ring-blue-500 shrink-0" style="width:24px;height:24px;">
           <div class="flex-1 min-w-0">
@@ -84,6 +90,7 @@
               <%= item.addedBy %>
             </p>
           </div>
+          <% if (canEdit) { %>
           <div class="flex items-center gap-1 shrink-0">
             <button onclick="changeQty('<%= item.id %>', -1)" aria-label="Moins"
               class="rounded-full bg-red-100 text-red-500 hover:bg-red-200 flex items-center justify-center text-base font-bold transition-colors" style="width:36px;height:36px;">−</button>
@@ -97,14 +104,17 @@
               </svg>
             </button>
           </div>
+          <% } %>
         </div>
       <% }) %>
     </div>
+    <% if (canEdit) { %>
     <div class="mt-4 text-center">
       <button id="clearCheckedBtn" onclick="clearChecked()" class="<%= list.items.some(i => i.checked) ? '' : 'hidden ' %>text-xs text-gray-400 hover:text-red-500 font-medium transition-colors">
         Vider les articles sélectionnés
       </button>
     </div>
+    <% } %>
     <% if (locals.user && list.created_by === user.email) { %>
       <div class="mt-8 pt-6 border-t border-gray-200">
         <button onclick="deleteList()"
@@ -130,6 +140,7 @@
 
   <script>
     const listId = '<%= list.id %>';
+    const CAN_EDIT = <%= canEdit ? 'true' : 'false' %>;
     const userPseudo = '<%= locals.user && user.pseudo ? user.pseudo.replace(/'/g, "\\'") : "" %>';
     const defaultName = userPseudo || 'Anonyme';
     const ws = new WebSocket((window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host);
@@ -141,7 +152,8 @@
       return pad(d.getDate()) + '/' + pad(d.getMonth()+1) + '/' + d.getFullYear() + ' à ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
     }
 
-    document.getElementById('addForm').addEventListener('submit', async function(e) {
+    const addFormEl = document.getElementById('addForm');
+    if (addFormEl) addFormEl.addEventListener('submit', async function(e) {
       e.preventDefault();
       const name = this.querySelector('[name="name"]').value.trim();
       const qty = parseInt(this.querySelector('[name="quantity"]').value, 10) || 1;
@@ -218,7 +230,8 @@
       const pct = total > 0 ? Math.round(done / total * 100) : 0;
       document.getElementById('progressText').textContent = total === 0 ? '' : done + ' / ' + total + ' sélectionnés (' + pct + ' %)';
       document.getElementById('progressBar').style.width = pct + '%';
-      document.getElementById('clearCheckedBtn').classList.toggle('hidden', done === 0);
+      const ccBtn = document.getElementById('clearCheckedBtn');
+      if (ccBtn) ccBtn.classList.toggle('hidden', done === 0);
     }
 
     async function clearChecked() {
@@ -237,20 +250,20 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z" />
           </svg>
           <p class="text-gray-800 font-medium text-sm mb-1">Liste vide</p>
-          <p class="text-gray-400 text-xs">Ajoute ton premier article ci-dessus</p>
+          <p class="text-gray-400 text-xs">${CAN_EDIT ? 'Ajoute ton premier article ci-dessus' : "Rien à afficher pour l'instant"}</p>
         </div>`;
         return;
       }
       container.innerHTML = [...items].sort((a, b) => (a.checked ? 1 : 0) - (b.checked ? 1 : 0)).map(item => `
         <div data-id="${item.id}" class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-2 transition-opacity ${item.checked ? 'opacity-50' : ''}">
-          <input type="checkbox" ${item.checked ? 'checked' : ''}
+          <input type="checkbox" ${item.checked ? 'checked' : ''} ${CAN_EDIT ? '' : 'disabled'}
             onchange="toggleItem('${item.id}')"
             class="rounded border-gray-300 text-blue-500 focus:ring-blue-500 shrink-0" style="width:24px;height:24px;">
           <div class="flex-1 min-w-0">
             <p class="${item.checked ? 'line-through text-gray-400' : 'text-gray-800'} font-medium text-sm truncate">${esc(item.name)}${item.quantity > 1 ? ' <span class="text-xs font-normal text-gray-400">× ' + item.quantity + '</span>' : ''}</p>
             <p class="text-xs text-gray-400 mt-0.5">${esc(item.addedBy)}</p>
           </div>
-          <div class="flex items-center gap-1 shrink-0">
+          <div class="${CAN_EDIT ? 'flex items-center gap-1 shrink-0' : 'hidden'}">
             <button onclick="changeQty('${item.id}', -1)" aria-label="Moins"
               class="rounded-full bg-red-100 text-red-500 hover:bg-red-200 flex items-center justify-center text-base font-bold transition-colors" style="width:36px;height:36px;">−</button>
             <span class="item-qty text-center text-sm font-medium text-gray-700" style="min-width:24px;">${item.quantity}</span>

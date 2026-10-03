@@ -1,230 +1,300 @@
 const bcrypt = require('bcryptjs');
 const { db } = require('./db');
 
-function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
-}
+// Invites (famille + listes) : 30 min max, usage unique
+const INVITE_TTL = `datetime('now', '-30 minutes')`;
 
-function shortId(length = 6) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
+// ---- tiny query helpers ----
+const get = (sql, ...params) => db.prepare(sql).get(...params);
+const all = (sql, ...params) => db.prepare(sql).all(...params);
+const run = (sql, ...params) => db.prepare(sql).run(...params);
+const normEmail = (email) => (email || '').trim().toLowerCase();
 
+// ---- ids ----
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+const ID_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const shortId = (length = 6) => Array.from({ length }, () => ID_CHARS.charAt(Math.floor(Math.random() * ID_CHARS.length))).join('');
+
+// ---- users ----
 function createUser(email, password) {
-  const existing = db.prepare('SELECT email FROM users WHERE email = ?').get(email);
-  if (existing) return null;
-  const hash = bcrypt.hashSync(password, 10);
-  db.prepare('INSERT INTO users (email, password) VALUES (?, ?)').run(email, hash);
+  if (get('SELECT email FROM users WHERE email = ?', email)) return null;
+  run('INSERT INTO users (email, password) VALUES (?, ?)', email, bcrypt.hashSync(password, 10));
   return { email, pseudo: '' };
 }
 
 function getUserByEmail(email) {
-  const user = db.prepare('SELECT email, pseudo FROM users WHERE email = ?').get(email);
-  return user || null;
+  return get('SELECT email, pseudo FROM users WHERE email = ?', email) || null;
 }
 
 function verifyUser(email, password) {
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-  if (!user) return false;
-  return bcrypt.compareSync(password, user.password);
+  const user = get('SELECT * FROM users WHERE email = ?', email);
+  return !!user && bcrypt.compareSync(password, user.password);
 }
 
 function setPseudo(email, pseudo) {
-  const user = db.prepare('SELECT email FROM users WHERE email = ?').get(email);
-  if (!user) return null;
-  db.prepare('UPDATE users SET pseudo = ? WHERE email = ?').run(pseudo, email);
+  if (!get('SELECT email FROM users WHERE email = ?', email)) return null;
+  run('UPDATE users SET pseudo = ? WHERE email = ?', pseudo, email);
   return { email, pseudo };
 }
 
 function updatePassword(email, newPassword) {
-  const hash = bcrypt.hashSync(newPassword, 10);
-  db.prepare('UPDATE users SET password = ? WHERE email = ?').run(hash, email);
+  run('UPDATE users SET password = ? WHERE email = ?', bcrypt.hashSync(newPassword, 10), email);
   return true;
-}
-
-function touchList(listId) {
-  db.prepare('UPDATE lists SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(listId);
-}
-
-function createList(name, createdBy) {
-  const id = shortId();
-  const token = shortId(12);
-  db.prepare('INSERT INTO lists (id, name, created_by, updated_at, share_token) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)').run(id, name, createdBy || null, token);
-  if (createdBy) addMember(id, createdBy);
-  return getList(id);
-}
-
-function getListsByUser(email) {
-  return db.prepare(`
-    SELECT l.id, l.name, l.updated_at, l.created_by,
-      (SELECT COUNT(*) FROM items WHERE list_id = l.id) AS item_count,
-      (SELECT COUNT(*) FROM items WHERE list_id = l.id AND checked = 1) AS checked_count
-    FROM lists l
-    LEFT JOIN list_members lm ON lm.list_id = l.id
-    WHERE l.created_by = ? OR lm.user_email = ?
-    GROUP BY l.id
-    ORDER BY l.updated_at DESC
-  `).all(email, email);
-}
-
-function getList(id) {
-  const list = db.prepare('SELECT * FROM lists WHERE id = ?').get(id);
-  if (!list) return null;
-  if (!list.share_token) {
-    list.share_token = shortId(12);
-    db.prepare('UPDATE lists SET share_token = ? WHERE id = ?').run(list.share_token, id);
-  }
-  list.items = db.prepare('SELECT id, name, quantity, checked, added_by AS addedBy FROM items WHERE list_id = ? ORDER BY created_at ASC').all(id);
-  list.items.forEach(item => item.checked = !!item.checked);
-  return list;
-}
-
-function getListByShareToken(token) {
-  const list = db.prepare('SELECT * FROM lists WHERE share_token = ?').get(token);
-  if (!list) return null;
-  list.items = db.prepare('SELECT id, name, quantity, checked, added_by AS addedBy FROM items WHERE list_id = ? ORDER BY created_at ASC').all(list.id);
-  list.items.forEach(item => item.checked = !!item.checked);
-  return list;
-}
-
-function addItem(listId, { name, quantity = 1, addedBy = 'Anonyme' }) {
-  const list = db.prepare('SELECT id FROM lists WHERE id = ?').get(listId);
-  if (!list) return null;
-  const existing = db.prepare('SELECT id, quantity FROM items WHERE list_id = ? AND LOWER(name) = LOWER(?)').get(listId, name);
-  if (existing) {
-    db.prepare('UPDATE items SET quantity = quantity + ? WHERE id = ?').run(quantity, existing.id);
-    touchList(listId);
-    return { id: existing.id, name, quantity: existing.quantity + quantity, checked: false, addedBy };
-  }
-  const id = uid();
-  db.prepare('INSERT INTO items (id, list_id, name, quantity, added_by) VALUES (?, ?, ?, ?, ?)').run(id, listId, name, quantity, addedBy);
-  touchList(listId);
-  return { id, name, quantity, checked: false, addedBy };
-}
-
-function changeItemQuantity(listId, itemId, delta) {
-  const item = db.prepare('SELECT * FROM items WHERE id = ? AND list_id = ?').get(itemId, listId);
-  if (!item) return null;
-  const newQty = item.quantity + delta;
-  if (newQty <= 0) {
-    db.prepare('DELETE FROM items WHERE id = ?').run(itemId);
-    touchList(listId);
-    return { deleted: true };
-  }
-  db.prepare('UPDATE items SET quantity = ? WHERE id = ?').run(newQty, itemId);
-  touchList(listId);
-  return { id: item.id, name: item.name, quantity: newQty, checked: !!item.checked, addedBy: item.added_by };
-}
-
-function toggleItem(listId, itemId) {
-  const item = db.prepare('SELECT * FROM items WHERE id = ? AND list_id = ?').get(itemId, listId);
-  if (!item) return null;
-  const newChecked = item.checked ? 0 : 1;
-  db.prepare('UPDATE items SET checked = ? WHERE id = ?').run(newChecked, itemId);
-  touchList(listId);
-  return { id: item.id, name: item.name, checked: !!newChecked, addedBy: item.added_by };
-}
-
-function removeItem(listId, itemId) {
-  const result = db.prepare('DELETE FROM items WHERE id = ? AND list_id = ?').run(itemId, listId);
-  if (result.changes > 0) touchList(listId);
-  return result.changes > 0;
-}
-
-function clearCheckedItems(listId) {
-  const result = db.prepare('DELETE FROM items WHERE list_id = ? AND checked = 1').run(listId);
-  if (result.changes > 0) touchList(listId);
-  return result.changes;
-}
-
-function deleteList(listId, email) {
-  const list = db.prepare('SELECT created_by FROM lists WHERE id = ?').get(listId);
-  if (!list) return false;
-  if (list.created_by !== email) return false;
-  db.prepare('DELETE FROM items WHERE list_id = ?').run(listId);
-  db.prepare('DELETE FROM lists WHERE id = ?').run(listId);
-  return true;
-}
-
-function rotateShareToken(listId) {
-  const token = shortId(12);
-  db.prepare('UPDATE lists SET share_token = ? WHERE id = ?').run(token, listId);
-  return token;
-}
-
-function addMember(listId, email) {
-  db.prepare('INSERT OR IGNORE INTO list_members (list_id, user_email) VALUES (?, ?)').run(listId, email);
-}
-
-function removeMember(listId, email) {
-  const list = db.prepare('SELECT created_by FROM lists WHERE id = ?').get(listId);
-  if (!list || list.created_by === email) return false;
-  db.prepare('DELETE FROM list_members WHERE list_id = ? AND user_email = ?').run(listId, email);
-  return true;
-}
-
-function getMembers(listId) {
-  return db.prepare(`
-    SELECT u.email, u.pseudo, lm.joined_at
-    FROM list_members lm
-    JOIN users u ON u.email = lm.user_email
-    WHERE lm.list_id = ?
-    ORDER BY lm.joined_at ASC
-  `).all(listId);
-}
-
-function getRecentItems(email, limit = 15) {
-  return db.prepare(`
-    SELECT i.id, i.name, i.quantity, i.added_by, i.created_at, l.name AS list_name, l.id AS list_id
-    FROM items i
-    JOIN lists l ON l.id = i.list_id
-    LEFT JOIN list_members lm ON lm.list_id = l.id
-    WHERE l.created_by = ? OR lm.user_email = ?
-    ORDER BY i.created_at DESC
-    LIMIT ?
-  `).all(email, email, limit);
 }
 
 function deleteUser(email) {
-  const owned = db.prepare('SELECT id FROM lists WHERE created_by = ?').all(email);
-  for (const l of owned) {
-    db.prepare('DELETE FROM items WHERE list_id = ?').run(l.id);
-    db.prepare('DELETE FROM list_members WHERE list_id = ?').run(l.id);
-    db.prepare('DELETE FROM lists WHERE id = ?').run(l.id);
+  for (const l of all('SELECT id FROM lists WHERE created_by = ?', email)) {
+    run('DELETE FROM items WHERE list_id = ?', l.id);
+    run('DELETE FROM list_members WHERE list_id = ?', l.id);
+    run('DELETE FROM lists WHERE id = ?', l.id);
   }
-  db.prepare('DELETE FROM list_members WHERE user_email = ?').run(email);
-  db.prepare('DELETE FROM pseudo_changes WHERE user_email = ?').run(email);
-  db.prepare('DELETE FROM users WHERE email = ?').run(email);
+  run('DELETE FROM list_members WHERE user_email = ?', email);
+  run('DELETE FROM pseudo_changes WHERE user_email = ?', email);
+  run('DELETE FROM family_members WHERE owner_email = ? OR member_email = ?', email, email);
+  run('DELETE FROM family_invites WHERE owner_email = ?', email);
+  run('DELETE FROM users WHERE email = ?', email);
   try {
-    const rows = db.prepare('SELECT sid, data FROM sessions').all();
-    for (const r of rows) {
-      try { if (JSON.parse(r.data).userEmail === email) db.prepare('DELETE FROM sessions WHERE sid = ?').run(r.sid); } catch {}
+    for (const r of all('SELECT sid, data FROM sessions')) {
+      try { if (JSON.parse(r.data).userEmail === email) run('DELETE FROM sessions WHERE sid = ?', r.sid); } catch {}
     }
   } catch {}
   return true;
 }
 
+// ---- pseudo quotas ----
 const PSEUDO_MAX_PER_WEEK = 2;
 const PSEUDO_MIN_GAP_MIN = 15;
 
 function getPseudoChangeStatus(email) {
-  const row = db.prepare(
-    `SELECT COUNT(*) AS count7d, MIN(changed_at) AS oldest, MAX(changed_at) AS last,
-      (strftime('%s','now') - strftime('%s', MAX(changed_at))) / 60.0 AS minsSinceLast
-     FROM pseudo_changes WHERE user_email = ? AND changed_at > datetime('now', '-7 days')`
-  ).get(email);
+  const row = get(`SELECT COUNT(*) AS count7d, MAX(changed_at) AS last, (strftime('%s','now') - strftime('%s', MAX(changed_at))) / 60.0 AS minsSinceLast FROM pseudo_changes WHERE user_email = ? AND changed_at > datetime('now', '-7 days')`, email);
   const count7d = row ? row.count7d : 0;
-  const minsSinceLast = row && row.minsSinceLast != null ? row.minsSinceLast : null;
-  return { count7d, remaining: Math.max(0, PSEUDO_MAX_PER_WEEK - count7d), minsSinceLast, oldest: row ? row.oldest : null };
+  return { count7d, remaining: Math.max(0, PSEUDO_MAX_PER_WEEK - count7d), minsSinceLast: row && row.minsSinceLast != null ? row.minsSinceLast : null };
 }
 
 function recordPseudoChange(email) {
-  db.prepare('DELETE FROM pseudo_changes WHERE user_email = ? AND changed_at <= datetime(\'now\', \'-7 days\')').run(email);
-  db.prepare('INSERT INTO pseudo_changes (user_email) VALUES (?)').run(email);
+  run(`DELETE FROM pseudo_changes WHERE user_email = ? AND changed_at <= datetime('now', '-7 days')`, email);
+  run('INSERT INTO pseudo_changes (user_email) VALUES (?)', email);
 }
 
-module.exports = { createList, getList, getListByShareToken, addItem, toggleItem, changeItemQuantity, removeItem, createUser, getUserByEmail, verifyUser, setPseudo, getListsByUser, deleteList, rotateShareToken, addMember, removeMember, getMembers, getRecentItems, deleteUser, updatePassword, getPseudoChangeStatus, recordPseudoChange, clearCheckedItems, PSEUDO_MAX_PER_WEEK, PSEUDO_MIN_GAP_MIN };
+// ---- lists ----
+function touchList(listId) {
+  run('UPDATE lists SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', listId);
+}
+
+function hydrateItems(list) {
+  if (!list) return null;
+  list.items = all('SELECT id, name, quantity, checked, added_by AS addedBy FROM items WHERE list_id = ? ORDER BY created_at ASC', list.id);
+  list.items.forEach((item) => { item.checked = !!item.checked; });
+  return list;
+}
+
+function createList(name, createdBy) {
+  const id = shortId();
+  run('INSERT INTO lists (id, name, created_by, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)', id, name, createdBy || null);
+  if (createdBy) {
+    addMember(id, createdBy);
+    for (const m of getFamilyMembers(createdBy)) addMember(id, m.email, m.canEdit);
+  }
+  return getList(id);
+}
+
+function getListsByUser(email) {
+  return all(`SELECT l.id, l.name, l.updated_at, l.created_by, COALESCE(MAX(lm.can_edit), 1) AS can_edit, (SELECT COUNT(*) FROM items WHERE list_id = l.id) AS item_count, (SELECT COUNT(*) FROM items WHERE list_id = l.id AND checked = 1) AS checked_count FROM lists l LEFT JOIN list_members lm ON lm.list_id = l.id WHERE l.created_by = ? OR lm.user_email = ? GROUP BY l.id ORDER BY l.updated_at DESC`, email, email);
+}
+
+function getList(id) {
+  return hydrateItems(get('SELECT * FROM lists WHERE id = ?', id));
+}
+
+function getListByShareToken(token) {
+  return hydrateItems(get('SELECT * FROM lists WHERE share_token = ?', token));
+}
+
+function isListMember(listId, email) {
+  const list = get('SELECT created_by FROM lists WHERE id = ?', listId);
+  if (!list) return false;
+  if (list.created_by === email) return true;
+  return !!get('SELECT 1 AS ok FROM list_members WHERE list_id = ? AND user_email = ?', listId, email);
+}
+
+// Droit d'écriture : créateur toujours, sinon colonne can_edit (NULL legacy = 1)
+function canEditList(listId, email) {
+  const list = get('SELECT created_by FROM lists WHERE id = ?', listId);
+  if (!list) return false;
+  if (list.created_by === email) return true;
+  const row = get('SELECT can_edit FROM list_members WHERE list_id = ? AND user_email = ?', listId, email);
+  if (!row) return false;
+  return row.can_edit == null || row.can_edit === 1;
+}
+
+function deleteList(listId, email) {
+  const list = get('SELECT created_by FROM lists WHERE id = ?', listId);
+  if (!list || list.created_by !== email) return false;
+  run('DELETE FROM items WHERE list_id = ?', listId);
+  run('DELETE FROM list_members WHERE list_id = ?', listId);
+  run('DELETE FROM lists WHERE id = ?', listId);
+  return true;
+}
+
+// ---- list invites : 30 min, usage unique, créées à la demande ----
+function createListInvite(listId) {
+  const token = shortId(12);
+  run('UPDATE lists SET share_token = ?, share_token_created_at = CURRENT_TIMESTAMP WHERE id = ?', token, listId);
+  return token;
+}
+
+function getValidListInvite(listId) {
+  const row = get(`SELECT share_token AS token FROM lists WHERE id = ? AND share_token IS NOT NULL AND share_token_created_at > ${INVITE_TTL}`, listId);
+  return row ? row.token : null;
+}
+
+function peekListInvite(token) {
+  return hydrateItems(get(`SELECT * FROM lists WHERE share_token = ? AND share_token_created_at > ${INVITE_TTL}`, token));
+}
+
+function consumeListInvite(token) {
+  const list = peekListInvite(token);
+  if (list) run('UPDATE lists SET share_token = NULL, share_token_created_at = NULL WHERE id = ?', list.id);
+  return list;
+}
+
+// ---- items ----
+const findItem = (listId, itemId) => get('SELECT * FROM items WHERE id = ? AND list_id = ?', itemId, listId);
+const toClientItem = (i) => ({ id: i.id, name: i.name, quantity: i.quantity, checked: !!i.checked, addedBy: i.added_by });
+
+function addItem(listId, { name, quantity = 1, addedBy = 'Anonyme' }) {
+  if (!get('SELECT id FROM lists WHERE id = ?', listId)) return null;
+  const existing = get('SELECT id, quantity FROM items WHERE list_id = ? AND LOWER(name) = LOWER(?)', listId, name);
+  if (existing) {
+    run('UPDATE items SET quantity = quantity + ? WHERE id = ?', quantity, existing.id);
+    touchList(listId);
+    return { id: existing.id, name, quantity: existing.quantity + quantity, checked: false, addedBy };
+  }
+  const id = uid();
+  run('INSERT INTO items (id, list_id, name, quantity, added_by) VALUES (?, ?, ?, ?, ?)', id, listId, name, quantity, addedBy);
+  touchList(listId);
+  return { id, name, quantity, checked: false, addedBy };
+}
+
+function changeItemQuantity(listId, itemId, delta) {
+  const item = findItem(listId, itemId);
+  if (!item) return null;
+  if (item.quantity + delta <= 0) {
+    run('DELETE FROM items WHERE id = ?', itemId);
+    touchList(listId);
+    return { deleted: true };
+  }
+  run('UPDATE items SET quantity = ? WHERE id = ?', item.quantity + delta, itemId);
+  touchList(listId);
+  return toClientItem({ ...item, quantity: item.quantity + delta });
+}
+
+function toggleItem(listId, itemId) {
+  const item = findItem(listId, itemId);
+  if (!item) return null;
+  run('UPDATE items SET checked = ? WHERE id = ?', item.checked ? 0 : 1, itemId);
+  touchList(listId);
+  return { id: item.id, name: item.name, checked: !item.checked, addedBy: item.added_by };
+}
+
+function removeItem(listId, itemId) {
+  const changed = run('DELETE FROM items WHERE id = ? AND list_id = ?', itemId, listId).changes > 0;
+  if (changed) touchList(listId);
+  return changed;
+}
+
+function clearCheckedItems(listId) {
+  const removed = run('DELETE FROM items WHERE list_id = ? AND checked = 1', listId).changes;
+  if (removed > 0) touchList(listId);
+  return removed;
+}
+
+// ---- list members ----
+function addMember(listId, email, canEdit = 1) {
+  run('INSERT OR IGNORE INTO list_members (list_id, user_email, can_edit) VALUES (?, ?, ?)', listId, email, canEdit ? 1 : 0);
+}
+
+function removeMember(listId, email) {
+  const list = get('SELECT created_by FROM lists WHERE id = ?', listId);
+  if (!list || list.created_by === email) return false;
+  run('DELETE FROM list_members WHERE list_id = ? AND user_email = ?', listId, email);
+  return true;
+}
+
+function getMembers(listId) {
+  return all(`SELECT u.email, u.pseudo, lm.joined_at, COALESCE(lm.can_edit, 1) AS canEdit FROM list_members lm JOIN users u ON u.email = lm.user_email WHERE lm.list_id = ? ORDER BY lm.joined_at ASC`, listId);
+}
+
+function getRecentItems(email, limit = 15) {
+  return all(`SELECT i.id, i.name, i.quantity, i.added_by, i.created_at, l.name AS list_name, l.id AS list_id FROM items i JOIN lists l ON l.id = i.list_id LEFT JOIN list_members lm ON lm.list_id = l.id WHERE l.created_by = ? OR lm.user_email = ? ORDER BY i.created_at DESC LIMIT ?`, email, email, limit);
+}
+
+// ---- family ----
+function getFamilyMembers(ownerEmail) {
+  return all(`SELECT u.email, u.pseudo, COALESCE(fm.can_edit, 1) AS canEdit FROM family_members fm JOIN users u ON u.email = fm.member_email WHERE fm.owner_email = ? ORDER BY fm.added_at ASC`, ownerEmail);
+}
+
+function addFamilyMember(ownerEmail, memberEmail) {
+  const member = normEmail(memberEmail);
+  if (!member) return 'empty';
+  if (member === ownerEmail) return 'self';
+  if (!getUserByEmail(member)) return 'nouser';
+  return run('INSERT OR IGNORE INTO family_members (owner_email, member_email, can_edit) VALUES (?, ?, 1)', ownerEmail, member).changes
+    ? 'added' : 'exists';
+}
+
+function removeFamilyMember(ownerEmail, memberEmail) {
+  run('DELETE FROM family_members WHERE owner_email = ? AND member_email = ?', ownerEmail, memberEmail);
+}
+
+// Familles dont cet utilisateur fait partie (il n'est pas le propriétaire)
+function getFamiliesOf(memberEmail) {
+  const m = normEmail(memberEmail);
+  return all(`SELECT u.email AS ownerEmail, u.pseudo AS ownerPseudo, COALESCE(fm.can_edit, 1) AS canEdit FROM family_members fm JOIN users u ON u.email = fm.owner_email WHERE fm.member_email = ? ORDER BY fm.added_at ASC`, m);
+}
+
+// Quitter la famille de quelqu'un + perdre l'accès à ses listes (sauf celles qu'on a créées)
+function leaveFamily(ownerEmail, memberEmail) {
+  const o = normEmail(ownerEmail), m = normEmail(memberEmail);
+  if (!o || !m || o === m) return false;
+  run('DELETE FROM family_members WHERE owner_email = ? AND member_email = ?', o, m);
+  run('DELETE FROM list_members WHERE user_email = ? AND list_id IN (SELECT id FROM lists WHERE created_by = ?)', m, o);
+  return true;
+}
+
+// Change le droit d'un membre + propage aux listes du propriétaire
+function setFamilyCanEdit(ownerEmail, memberEmail, canEdit) {
+  const v = canEdit ? 1 : 0;
+  run('UPDATE family_members SET can_edit = ? WHERE owner_email = ? AND member_email = ?', v, ownerEmail, memberEmail);
+  run('UPDATE list_members SET can_edit = ? WHERE user_email = ? AND list_id IN (SELECT id FROM lists WHERE created_by = ?)', v, memberEmail, ownerEmail);
+  return true;
+}
+
+// ---- family invites : 30 min, usage unique, créées à la demande ----
+function createFamilyInvite(ownerEmail) {
+  const token = shortId(12);
+  run(`INSERT INTO family_invites (owner_email, token, created_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(owner_email) DO UPDATE SET token = excluded.token, created_at = CURRENT_TIMESTAMP`, ownerEmail, token);
+  return token;
+}
+
+function getValidFamilyInvite(ownerEmail) {
+  const row = get(`SELECT token FROM family_invites WHERE owner_email = ? AND created_at > ${INVITE_TTL}`, ownerEmail);
+  return row ? row.token : null;
+}
+
+function peekFamilyInvite(token) {
+  const row = get(`SELECT owner_email FROM family_invites WHERE token = ? AND created_at > ${INVITE_TTL}`, token);
+  return row ? row.owner_email : null;
+}
+
+function consumeFamilyInvite(token) {
+  const owner = peekFamilyInvite(token);
+  if (owner) run('DELETE FROM family_invites WHERE token = ?', token);
+  return owner;
+}
+
+function hasFamilyInvite(token) {
+  return !!get('SELECT 1 AS ok FROM family_invites WHERE token = ?', token);
+}
+
+module.exports = { createList, getList, getListByShareToken, addItem, toggleItem, changeItemQuantity, removeItem, createUser, getUserByEmail, verifyUser, setPseudo, getListsByUser, deleteList, addMember, removeMember, getMembers, getRecentItems, deleteUser, updatePassword, getPseudoChangeStatus, recordPseudoChange, clearCheckedItems, isListMember, canEditList, createListInvite, getValidListInvite, peekListInvite, consumeListInvite, getFamilyMembers, addFamilyMember, removeFamilyMember, setFamilyCanEdit, getFamiliesOf, leaveFamily, createFamilyInvite, getValidFamilyInvite, peekFamilyInvite, consumeFamilyInvite, hasFamilyInvite, PSEUDO_MAX_PER_WEEK, PSEUDO_MIN_GAP_MIN };

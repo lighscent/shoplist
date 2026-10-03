@@ -48,6 +48,7 @@ db.exec(`
     list_id TEXT NOT NULL,
     user_email TEXT NOT NULL,
     joined_at TEXT DEFAULT (datetime('now')),
+    can_edit INTEGER DEFAULT 1,
     PRIMARY KEY (list_id, user_email),
     FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE,
     FOREIGN KEY (user_email) REFERENCES users(email)
@@ -61,17 +62,40 @@ db.exec(`
   )
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS family_members (
+    owner_email TEXT NOT NULL,
+    member_email TEXT NOT NULL,
+    added_at TEXT DEFAULT (datetime('now')),
+    can_edit INTEGER DEFAULT 1,
+    PRIMARY KEY (owner_email, member_email)
+  )
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS family_invites (
+    owner_email TEXT PRIMARY KEY,
+    token TEXT NOT NULL,
+    created_at TEXT
+  )
+`);
+
+// NOTE: no DEFAULT on ADD COLUMN — SQLite refuses non-constant defaults
+// (e.g. CURRENT_TIMESTAMP) when the table already has rows (constant DEFAULT 1 is fine,
+// but plain column + backfill below keeps it uniform and risk-free)
+try { db.exec("ALTER TABLE family_members ADD COLUMN can_edit INTEGER"); } catch {}
+try { db.exec("ALTER TABLE list_members ADD COLUMN can_edit INTEGER"); } catch {}
+db.prepare("UPDATE family_members SET can_edit = 1 WHERE can_edit IS NULL").run();
+db.prepare("UPDATE list_members SET can_edit = 1 WHERE can_edit IS NULL").run();
+try { db.exec("ALTER TABLE family_invites ADD COLUMN created_at TEXT"); } catch {}
+try { db.exec("ALTER TABLE lists ADD COLUMN share_token_created_at TEXT"); } catch {}
+// backfill timestamps so pre-existing invites stay valid 30 min after deploy
+db.prepare("UPDATE family_invites SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL").run();
+db.prepare("UPDATE lists SET share_token_created_at = CURRENT_TIMESTAMP WHERE share_token IS NOT NULL AND share_token_created_at IS NULL").run();
+
 try { db.exec("ALTER TABLE users ADD COLUMN pseudo TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE lists ADD COLUMN updated_at TEXT DEFAULT CURRENT_TIMESTAMP"); } catch {}
 try { db.exec("ALTER TABLE lists ADD COLUMN share_token TEXT"); } catch {}
-// backfill existing lists missing a share token
-const missing = db.prepare("SELECT id FROM lists WHERE share_token IS NULL").all();
-const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-for (const row of missing) {
-  let token = '';
-  for (let i = 0; i < 12; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
-  db.prepare('UPDATE lists SET share_token = ? WHERE id = ?').run(token, row.id);
-}
 
 const SessionStore = require('express-session').Store;
 

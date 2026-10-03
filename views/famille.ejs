@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Famille - ShopList</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="manifest" href="/manifest.json?v=<%= locals.version %>">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <meta name="theme-color" content="#3b82f6">
+</head>
+<body class="bg-gray-50 min-h-dvh">
+  <div class="max-w-sm mx-auto px-4 py-6 pb-10">
+    <div class="flex items-center gap-3 mb-6">
+      <a href="/profile" class="shrink-0 text-gray-400 hover:text-gray-600 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </a>
+      <h1 id="familleTitle" class="text-xl font-bold text-gray-800 truncate">Famille (<span id="familleCount"><%= members.length %></span>)</h1>
+    </div>
+
+    <% if (locals.error) { %>
+      <p class="bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 mb-4 border border-red-200"><%= error %></p>
+    <% } %>
+    <% if (locals.success) { %>
+      <p class="bg-green-100 text-gray-800 text-sm rounded-xl px-4 py-3 mb-4"><%= success %></p>
+    <% } %>
+
+    <p class="text-xs text-gray-400 mb-4">Les membres de ta famille sont ajoutés automatiquement à chaque liste que tu crées. Touche la pastille pour choisir : <b>Éditeur</b> ou <b>Lecteur</b>.</p>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
+      <p class="text-xs text-gray-400 mb-2">Lien d'invitation — valide 30 min, usage unique</p>
+      <div id="inviteBox">
+        <% if (inviteUrl) { %>
+          <div class="flex gap-2">
+            <input id="inviteInput" type="text" readonly value="<%= inviteUrl %>"
+              class="flex-1 min-w-0 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-500 truncate">
+            <button id="copyBtn" type="button" onclick="copyInvite()"
+              class="bg-blue-500 text-white font-medium px-4 rounded-xl text-sm hover:bg-blue-600 active:bg-blue-700 transition-colors shrink-0">
+              Copier
+            </button>
+          </div>
+        <% } else { %>
+          <button id="genBtn" type="button" onclick="genInvite()"
+            class="w-full bg-blue-500 text-white font-medium py-2.5 rounded-xl text-sm hover:bg-blue-600 active:bg-blue-700 transition-colors">
+            Générer un lien
+          </button>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
+      <p class="text-xs text-gray-400 mb-2">Ajouter par email</p>
+      <form id="addForm" action="/famille/add" method="POST" class="flex gap-2">
+        <input type="email" id="addInput" name="email" placeholder="email@exemple.fr" required
+          class="flex-1 min-w-0 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        <button type="submit"
+          class="bg-blue-500 text-white font-medium px-4 rounded-xl text-sm hover:bg-blue-600 active:bg-blue-700 transition-colors shrink-0">
+          Ajouter
+        </button>
+      </form>
+      <p id="addMsg" class="text-xs mt-2 hidden"></p>
+    </div>
+
+    <div id="memberRows" class="space-y-2">
+      <% members.forEach(function(m) { %>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 flex items-center gap-3" data-email="<%= m.email %>">
+          <div class="shrink-0 flex items-center justify-center font-bold" style="width:40px;height:40px;border-radius:9999px;background:#dbeafe;color:#1d4ed8;"><%= ((m.pseudo || m.email)[0] || '?').toUpperCase() %></div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-gray-800 truncate"><%= m.pseudo || m.email %></p>
+            <p class="text-xs text-gray-400 truncate"><%= m.email %></p>
+          </div>
+          <div class="flex flex-col items-end gap-1 shrink-0">
+            <button type="button" class="rightsBtn" data-edit="<%= m.canEdit ? 1 : 0 %>" title="Changer les droits"
+              style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:9999px;<%= m.canEdit ? 'background:#dbeafe;color:#1d4ed8;' : 'background:#f3f4f6;color:#6b7280;' %>"><%= m.canEdit ? 'Éditeur' : 'Lecteur' %></button>
+            <button type="button" class="removeBtn text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1">Retirer</button>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+    <p id="emptyState" class="text-center text-sm text-gray-400 mt-6 <%= members.length ? 'hidden' : '' %>">Ta famille est vide pour l'instant.</p>
+
+    <h2 class="text-sm font-bold text-gray-800 mt-8 mb-2">Familles dont je fais partie (<%= (locals.familiesOf || []).length %>)</h2>
+    <div id="familiesOfRows" class="space-y-2">
+      <% (locals.familiesOf || []).forEach(function(f) { %>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 flex items-center gap-3" data-owner="<%= f.ownerEmail %>">
+          <div class="shrink-0 flex items-center justify-center font-bold" style="width:40px;height:40px;border-radius:9999px;background:#f3f4f6;color:#4b5563;"><%= ((f.ownerPseudo || f.ownerEmail)[0] || '?').toUpperCase() %></div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-gray-800 truncate">Famille de <%= f.ownerPseudo || f.ownerEmail %></p>
+            <p class="text-xs text-gray-400 truncate"><%= f.ownerEmail %></p>
+          </div>
+          <div class="flex flex-col items-end gap-1 shrink-0">
+            <span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:9999px;<%= f.canEdit ? 'background:#dbeafe;color:#1d4ed8;' : 'background:#f3f4f6;color:#6b7280;' %>"><%= f.canEdit ? 'Éditeur' : 'Lecteur' %></span>
+            <button type="button" class="leaveBtn text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1">Quitter</button>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+    <p id="familiesOfEmpty" class="text-center text-sm text-gray-400 mt-4 <%= (locals.familiesOf || []).length ? 'hidden' : '' %>">Tu ne fais partie d'aucune autre famille.</p>
+  </div>
+
+  <script>
+    function flashMsg(el, text, ok) {
+      el.textContent = text;
+      el.classList.remove('hidden');
+      el.style.color = ok ? '#15803d' : '#dc2626';
+    }
+
+    function inviteInputValue() {
+      return document.getElementById('inviteInput').value;
+    }
+
+    async function copyInvite() {
+      const btn = document.getElementById('copyBtn');
+      try { await navigator.clipboard.writeText(inviteInputValue()); } catch (e) {
+        const input = document.getElementById('inviteInput');
+        input.select();
+        document.execCommand('copy');
+      }
+      const old = btn.textContent;
+      btn.textContent = 'Copié !';
+      setTimeout(() => { btn.textContent = old; }, 1500);
+    }
+
+    async function genInvite() {
+      const res = await fetch('/famille/invite', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.url) return;
+      const box = document.getElementById('inviteBox');
+      box.innerHTML = '<div class="flex gap-2">'
+        + '<input id="inviteInput" type="text" readonly value="' + data.url + '"'
+        + ' class="flex-1 min-w-0 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-500 truncate">'
+        + '<button id="copyBtn" type="button" onclick="copyInvite()"'
+        + ' class="bg-blue-500 text-white font-medium px-4 rounded-xl text-sm hover:bg-blue-600 active:bg-blue-700 transition-colors shrink-0">Copier</button>'
+        + '</div>';
+    }
+
+    function paintRights(btn, v) {
+      btn.dataset.edit = v ? '1' : '0';
+      btn.textContent = v ? 'Éditeur' : 'Lecteur';
+      btn.style.cssText = 'font-size:11px;font-weight:600;padding:4px 10px;border-radius:9999px;' + (v ? 'background:#dbeafe;color:#1d4ed8;' : 'background:#f3f4f6;color:#6b7280;');
+    }
+
+    async function onRightsClick(e) {
+      const btn = e.currentTarget;
+      const row = btn.closest('[data-email]');
+      const next = btn.dataset.edit === '1' ? 0 : 1;
+      try {
+        const res = await fetch('/famille/rights', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+          body: new URLSearchParams({ email: row.dataset.email, can_edit: String(next) })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) paintRights(btn, data.canEdit ? 1 : 0);
+      } catch {}
+    }
+
+    function memberRow(email, pseudo, canEdit) {
+      const row = document.createElement('div');
+      row.className = 'bg-white rounded-2xl shadow-sm border border-gray-100 p-3 flex items-center gap-3';
+      row.dataset.email = email;
+      const avatar = document.createElement('div');
+      avatar.className = 'shrink-0 flex items-center justify-center font-bold';
+      avatar.style.cssText = 'width:40px;height:40px;border-radius:9999px;background:#dbeafe;color:#1d4ed8;';
+      avatar.textContent = ((pseudo || email)[0] || '?').toUpperCase();
+      const info = document.createElement('div');
+      info.className = 'flex-1 min-w-0';
+      const name = document.createElement('p');
+      name.className = 'text-sm font-medium text-gray-800 truncate';
+      name.textContent = pseudo || email;
+      const mail = document.createElement('p');
+      mail.className = 'text-xs text-gray-400 truncate';
+      mail.textContent = email;
+      info.appendChild(name);
+      info.appendChild(mail);
+      const side = document.createElement('div');
+      side.className = 'flex flex-col items-end gap-1 shrink-0';
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'rightsBtn';
+      pill.title = 'Changer les droits';
+      pill.addEventListener('click', onRightsClick);
+      paintRights(pill, canEdit ? 1 : 0);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'removeBtn text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1';
+      btn.textContent = 'Retirer';
+      btn.addEventListener('click', onRemoveClick);
+      side.appendChild(pill);
+      side.appendChild(btn);
+      row.appendChild(avatar);
+      row.appendChild(info);
+      row.appendChild(side);
+      return row;
+    }
+
+    function updateCount() {
+      document.getElementById('familleCount').textContent = document.querySelectorAll('#memberRows > div').length;
+    }
+
+    document.getElementById('addForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const msg = document.getElementById('addMsg');
+      const input = document.getElementById('addInput');
+      try {
+        const res = await fetch(this.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+          body: new URLSearchParams(new FormData(this))
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          document.getElementById('memberRows').appendChild(memberRow(data.member.email, data.member.pseudo, data.member.canEdit));
+          document.getElementById('emptyState').classList.add('hidden');
+          updateCount();
+          input.value = '';
+          flashMsg(msg, 'Ajouté à ta famille', true);
+        } else {
+          flashMsg(msg, data.error || 'Erreur', false);
+        }
+      } catch { this.submit(); }
+    });
+
+    async function onRemoveClick(e) {
+      const btn = e.currentTarget;
+      if (btn.dataset.armed) {
+        const row = btn.closest('[data-email]');
+        try {
+          const res = await fetch('/famille/remove', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+            body: new URLSearchParams({ email: row.dataset.email })
+          });
+          if (res.ok) {
+            row.remove();
+            updateCount();
+            if (!document.querySelectorAll('#memberRows > div').length) document.getElementById('emptyState').classList.remove('hidden');
+          }
+        } catch {}
+      } else {
+        btn.dataset.armed = '1';
+        const old = btn.textContent;
+        btn.textContent = 'Sûr ?';
+        setTimeout(() => { delete btn.dataset.armed; btn.textContent = old; }, 3000);
+      }
+    }
+    document.querySelectorAll('.removeBtn').forEach(b => b.addEventListener('click', onRemoveClick));
+    document.querySelectorAll('.rightsBtn').forEach(b => b.addEventListener('click', onRightsClick));
+
+    async function onLeaveClick(e) {
+      const btn = e.currentTarget;
+      if (btn.dataset.armed) {
+        const row = btn.closest('[data-owner]');
+        try {
+          const res = await fetch('/famille/leave', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+            body: new URLSearchParams({ owner: row.dataset.owner })
+          });
+          if (res.ok) {
+            row.remove();
+            if (!document.querySelectorAll('#familiesOfRows > div').length) document.getElementById('familiesOfEmpty').classList.remove('hidden');
+          }
+        } catch {}
+      } else {
+        btn.dataset.armed = '1';
+        const old = btn.textContent;
+        btn.textContent = 'Sûr ?';
+        setTimeout(() => { delete btn.dataset.armed; btn.textContent = old; }, 3000);
+      }
+    }
+    document.querySelectorAll('.leaveBtn').forEach(b => b.addEventListener('click', onLeaveClick));
+  </script>
+  <footer class="fixed bottom-0 left-0 right-0 pb-3 pt-6 text-center text-xs text-gray-300 pointer-events-none bg-gradient-to-t from-gray-50 to-transparent">v<%= locals.version %></footer>
+  <script src="/js/app-version.js?v=<%= locals.version %>" defer></script>
+</body>
+</html>
