@@ -54,6 +54,13 @@ db.exec(`
   )
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS pseudo_changes (
+    user_email TEXT NOT NULL,
+    changed_at TEXT DEFAULT (datetime('now'))
+  )
+`);
+
 try { db.exec("ALTER TABLE users ADD COLUMN pseudo TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE lists ADD COLUMN updated_at TEXT DEFAULT CURRENT_TIMESTAMP"); } catch {}
 try { db.exec("ALTER TABLE lists ADD COLUMN share_token TEXT"); } catch {}

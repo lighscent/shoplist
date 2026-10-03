@@ -42,6 +42,18 @@ app.get('/manifest.json', (req, res) => {
     theme_color: '#3b82f6',
     icons: [
       {
+        src: '/icon-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'any'
+      },
+      {
+        src: '/icon-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any maskable'
+      },
+      {
         src: '/icon.svg',
         sizes: '512x512',
         type: 'image/svg+xml',
@@ -94,6 +106,7 @@ app.use(session({
 app.use((req, res, next) => {
   res.locals.user = null;
   res.locals.version = APP_VERSION;
+  if (req.method === 'GET') res.setHeader('Cache-Control', 'no-store');
   if (req.session.userEmail) {
     const user = store.getUserByEmail(req.session.userEmail);
     if (user) res.locals.user = user;

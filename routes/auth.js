@@ -57,4 +57,57 @@ router.post('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/login'));
 });
 
+router.get('/profile', requireAuth, (req, res) => {
+  const pseudoStatus = store.getPseudoChangeStatus(req.session.userEmail);
+  res.render('profile', { error: null, pseudoStatus });
+});
+
+router.post('/profile/pseudo', requireAuth, (req, res) => {
+  const email = req.session.userEmail;
+  const wantsJson = req.get('X-Requested-With') === 'XMLHttpRequest' || (req.get('Accept') || '').includes('application/json');
+  const pseudoStatus = store.getPseudoChangeStatus(email);
+  const fail = (status, error) => wantsJson
+    ? res.status(status).json({ error })
+    : res.render('profile', { error, pseudoStatus: store.getPseudoChangeStatus(email) });
+  const { pseudo } = req.body;
+  if (!pseudo || !pseudo.trim()) return fail(400, 'Veuillez choisir un pseudo');
+  if (pseudo.trim().length < 2) return fail(400, 'Le pseudo doit contenir au moins 2 caracteres');
+  if (pseudo.trim() === res.locals.user.pseudo) {
+    return wantsJson
+      ? res.json({ ok: true, unchanged: true, pseudo: res.locals.user.pseudo, remaining: pseudoStatus.remaining })
+      : res.redirect('/profile');
+  }
+  if (pseudoStatus.count7d >= store.PSEUDO_MAX_PER_WEEK) return fail(429, 'Limite atteinte : 2 changements de pseudo par 7 jours maximum');
+  if (pseudoStatus.minsSinceLast != null && pseudoStatus.minsSinceLast < store.PSEUDO_MIN_GAP_MIN) {
+    const wait = Math.ceil(store.PSEUDO_MIN_GAP_MIN - pseudoStatus.minsSinceLast);
+    return fail(429, 'Attends encore ' + wait + ' min avant de rechanger de pseudo');
+  }
+  store.setPseudo(email, pseudo.trim());
+  store.recordPseudoChange(email);
+  if (wantsJson) return res.json({ ok: true, pseudo: pseudo.trim(), remaining: store.getPseudoChangeStatus(email).remaining });
+  res.redirect('/profile');
+});
+
+router.post('/account/delete', requireAuth, (req, res) => {
+  const email = req.session.userEmail;
+  store.deleteUser(email);
+  req.session.destroy(() => res.redirect('/register'));
+});
+
+router.post('/profile/password', requireAuth, (req, res) => {
+  const email = req.session.userEmail;
+  const wantsJson = req.get('X-Requested-With') === 'XMLHttpRequest' || (req.get('Accept') || '').includes('application/json');
+  const pseudoStatus = store.getPseudoChangeStatus(email);
+  const fail = (status, error) => wantsJson
+    ? res.status(status).json({ error })
+    : res.render('profile', { error, success: null, pseudoStatus });
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) return fail(400, 'Veuillez remplir tous les champs');
+  if (newPassword.length < 4) return fail(400, 'Le nouveau mot de passe doit contenir au moins 4 caracteres');
+  if (!store.verifyUser(email, currentPassword)) return fail(400, 'Mot de passe actuel incorrect');
+  store.updatePassword(email, newPassword);
+  if (wantsJson) return res.json({ ok: true });
+  return res.render('profile', { error: null, success: 'Mot de passe mis à jour', pseudoStatus });
+});
+
 module.exports = router;

@@ -12,15 +12,14 @@
   <meta name="theme-color" content="#3b82f6">
 </head>
 <body class="bg-gray-50 min-h-dvh">
-  <div class="max-w-sm mx-auto px-4 py-6">
-    <div class="flex items-start justify-between mb-6">
-      <div class="min-w-0 flex-1 flex items-center gap-3">
-        <a href="/" class="shrink-0 text-gray-400 hover:text-gray-600 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </a>
-        <div class="min-w-0">
+  <div class="max-w-sm mx-auto px-4 py-6 pb-10">
+    <div class="flex items-center gap-2 mb-4" style="position:sticky;top:0;z-index:30;background:#f9fafb;padding:12px 0;">
+      <a href="/" aria-label="Retour" class="shrink-0 text-gray-400 hover:text-gray-600 transition-colors p-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </a>
+      <div class="min-w-0 flex-1">
           <h1 class="text-2xl font-bold text-gray-800 truncate"><%= list.name %></h1>
           <p class="text-xs text-gray-400 mt-1" id="updatedDate">
           <% 
@@ -31,54 +30,68 @@
           Modifiée le <%= formatted %>
         </p>
       </div>
-    </div>
-      <a href="/list/<%= list.id %>/members"
-        class="shrink-0 text-gray-400 hover:text-gray-600 transition-colors p-1.5">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <a href="/list/<%= list.id %>/members" title="Membres" aria-label="Membres"
+        class="shrink-0 text-gray-400 hover:text-gray-600 transition-colors p-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
         </svg>
       </a>
     </div>
 
-    <form id="addForm" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
-      <div class="flex gap-2 mb-3">
-        <input type="number" name="quantity" min="1" value="1"
-          class="w-16 px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shrink-0">
-        <input type="text" name="name" placeholder="Nom de l'article" required
-          class="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+    <div class="mb-6">
+      <% const total0 = list.items.length; const done0 = list.items.filter(i => i.checked).length; const pct0 = total0 > 0 ? Math.round(done0 / total0 * 100) : 0; %>
+      <p id="progressText" class="text-xs text-gray-400 mb-1.5"><% if (total0 > 0) { %><%= done0 %> / <%= total0 %> sélectionnés (<%= pct0 %> %)<% } %></p>
+      <div class="rounded-full" style="height:8px;background:#e5e7eb;">
+        <div id="progressBar" class="rounded-full transition-all" style="height:8px;width:<%= pct0 %>%;background:#3b82f6;"></div>
       </div>
-      <button type="submit"
-        class="w-full bg-blue-500 text-white font-medium py-2.5 rounded-xl text-sm hover:bg-blue-600 active:bg-blue-700 transition-colors">
-        Ajouter
+    </div>
+
+    <form id="addForm" class="flex gap-2 mb-6">
+      <input type="number" name="quantity" min="1" value="1"
+        class="px-3 bg-white border border-gray-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shrink-0" style="width:56px;height:48px;">
+      <input type="text" name="name" placeholder="Ajouter un article..." required
+        class="flex-1 min-w-0 px-4 bg-white border border-gray-200 rounded-xl text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" style="height:48px;">
+      <button type="submit" title="Ajouter" aria-label="Ajouter"
+        style="width:48px;height:48px;"
+        class="shrink-0 bg-blue-500 text-white rounded-xl hover:bg-blue-600 active:bg-blue-700 transition-colors flex items-center justify-center shadow-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
       </button>
     </form>
 
     <div id="itemsList" class="space-y-2">
-      <% if (list.items.length === 0) { %>
-        <p class="text-center text-gray-400 py-12 text-sm">Aucun article. Ajoutez-en un !</p>
+      <% const sorted = [...list.items].sort((a, b) => (a.checked ? 1 : 0) - (b.checked ? 1 : 0)); %>
+      <% if (sorted.length === 0) { %>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z" />
+          </svg>
+          <p class="text-gray-800 font-medium text-sm mb-1">Liste vide</p>
+          <p class="text-gray-400 text-xs">Ajoute ton premier article ci-dessus</p>
+        </div>
       <% } %>
-      <% list.items.forEach(item => { %>
+      <% sorted.forEach(item => { %>
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-2 transition-opacity <%= item.checked ? 'opacity-50' : '' %>" data-id="<%= item.id %>">
           <input type="checkbox" <%= item.checked ? 'checked' : '' %>
             onchange="toggleItem('<%= item.id %>')"
-            class="w-5 h-5 rounded border-gray-300 text-blue-500 focus:ring-blue-500 shrink-0">
+            class="rounded border-gray-300 text-blue-500 focus:ring-blue-500 shrink-0" style="width:24px;height:24px;">
           <div class="flex-1 min-w-0">
             <p class="<%= item.checked ? 'line-through text-gray-400' : 'text-gray-800' %> font-medium text-sm truncate">
-              <%= item.name %>
+              <%= item.name %><% if (item.quantity > 1) { %> <span class="text-xs font-normal text-gray-400">× <%= item.quantity %></span><% } %>
             </p>
             <p class="text-xs text-gray-400 mt-0.5">
               <%= item.addedBy %>
             </p>
           </div>
           <div class="flex items-center gap-1 shrink-0">
-            <button onclick="changeQty('<%= item.id %>', -1)"
-              class="w-7 h-7 rounded-full bg-red-100 text-red-500 hover:bg-red-200 flex items-center justify-center text-sm font-bold transition-colors">−</button>
-            <span class="item-qty w-6 text-center text-sm font-medium text-gray-700"><%= item.quantity %></span>
-            <button onclick="changeQty('<%= item.id %>', 1)"
-              class="w-7 h-7 rounded-full bg-green-100 text-green-500 hover:bg-green-200 flex items-center justify-center text-sm font-bold transition-colors">+</button>
-            <button onclick="deleteItem('<%= item.id %>')"
-              class="text-red-300 hover:text-red-500 transition-colors p-1 ml-1">
+            <button onclick="changeQty('<%= item.id %>', -1)" aria-label="Moins"
+              class="rounded-full bg-red-100 text-red-500 hover:bg-red-200 flex items-center justify-center text-base font-bold transition-colors" style="width:36px;height:36px;">−</button>
+            <span class="item-qty text-center text-sm font-medium text-gray-700" style="min-width:24px;"><%= item.quantity %></span>
+            <button onclick="changeQty('<%= item.id %>', 1)" aria-label="Plus"
+              class="rounded-full bg-green-100 text-green-500 hover:bg-green-200 flex items-center justify-center text-base font-bold transition-colors" style="width:36px;height:36px;">+</button>
+            <button onclick="deleteItem('<%= item.id %>')" aria-label="Supprimer"
+              class="text-red-300 hover:text-red-500 transition-colors p-2 ml-1">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -86,6 +99,11 @@
           </div>
         </div>
       <% }) %>
+    </div>
+    <div class="mt-4 text-center">
+      <button id="clearCheckedBtn" onclick="clearChecked()" class="<%= list.items.some(i => i.checked) ? '' : 'hidden ' %>text-xs text-gray-400 hover:text-red-500 font-medium transition-colors">
+        Vider les articles sélectionnés
+      </button>
     </div>
     <% if (locals.user && list.created_by === user.email) { %>
       <div class="mt-8 pt-6 border-t border-gray-200">
@@ -194,29 +212,52 @@
       document.getElementById('updatedDate').textContent = 'Modifiée le ' + fmtDate(data.updated_at);
     }
 
+    function updateProgress(items) {
+      const total = items.length;
+      const done = items.filter(i => i.checked).length;
+      const pct = total > 0 ? Math.round(done / total * 100) : 0;
+      document.getElementById('progressText').textContent = total === 0 ? '' : done + ' / ' + total + ' sélectionnés (' + pct + ' %)';
+      document.getElementById('progressBar').style.width = pct + '%';
+      document.getElementById('clearCheckedBtn').classList.toggle('hidden', done === 0);
+    }
+
+    async function clearChecked() {
+      const ok = await showConfirm('Supprimer tous les articles sélectionnés ?');
+      if (!ok) return;
+      await fetch('/api/list/' + listId + '/checked', { method: 'DELETE' });
+      refreshList();
+    }
+
     function renderItems(items) {
       const container = document.getElementById('itemsList');
+      updateProgress(items);
       if (items.length === 0) {
-        container.innerHTML = '<p class="text-center text-gray-400 py-12 text-sm">Aucun article. Ajoutez-en un !</p>';
+        container.innerHTML = `<div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z" />
+          </svg>
+          <p class="text-gray-800 font-medium text-sm mb-1">Liste vide</p>
+          <p class="text-gray-400 text-xs">Ajoute ton premier article ci-dessus</p>
+        </div>`;
         return;
       }
-      container.innerHTML = items.map(item => `
+      container.innerHTML = [...items].sort((a, b) => (a.checked ? 1 : 0) - (b.checked ? 1 : 0)).map(item => `
         <div data-id="${item.id}" class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-2 transition-opacity ${item.checked ? 'opacity-50' : ''}">
           <input type="checkbox" ${item.checked ? 'checked' : ''}
             onchange="toggleItem('${item.id}')"
-            class="w-5 h-5 rounded border-gray-300 text-blue-500 focus:ring-blue-500 shrink-0">
+            class="rounded border-gray-300 text-blue-500 focus:ring-blue-500 shrink-0" style="width:24px;height:24px;">
           <div class="flex-1 min-w-0">
-            <p class="${item.checked ? 'line-through text-gray-400' : 'text-gray-800'} font-medium text-sm truncate">${esc(item.name)}</p>
+            <p class="${item.checked ? 'line-through text-gray-400' : 'text-gray-800'} font-medium text-sm truncate">${esc(item.name)}${item.quantity > 1 ? ' <span class="text-xs font-normal text-gray-400">× ' + item.quantity + '</span>' : ''}</p>
             <p class="text-xs text-gray-400 mt-0.5">${esc(item.addedBy)}</p>
           </div>
           <div class="flex items-center gap-1 shrink-0">
-            <button onclick="changeQty('${item.id}', -1)"
-              class="w-7 h-7 rounded-full bg-red-100 text-red-500 hover:bg-red-200 flex items-center justify-center text-sm font-bold transition-colors">−</button>
-            <span class="item-qty w-6 text-center text-sm font-medium text-gray-700">${item.quantity}</span>
-            <button onclick="changeQty('${item.id}', 1)"
-              class="w-7 h-7 rounded-full bg-green-100 text-green-500 hover:bg-green-200 flex items-center justify-center text-sm font-bold transition-colors">+</button>
-            <button onclick="deleteItem('${item.id}')"
-              class="text-red-300 hover:text-red-500 transition-colors p-1 ml-1">
+            <button onclick="changeQty('${item.id}', -1)" aria-label="Moins"
+              class="rounded-full bg-red-100 text-red-500 hover:bg-red-200 flex items-center justify-center text-base font-bold transition-colors" style="width:36px;height:36px;">−</button>
+            <span class="item-qty text-center text-sm font-medium text-gray-700" style="min-width:24px;">${item.quantity}</span>
+            <button onclick="changeQty('${item.id}', 1)" aria-label="Plus"
+              class="rounded-full bg-green-100 text-green-500 hover:bg-green-200 flex items-center justify-center text-base font-bold transition-colors" style="width:36px;height:36px;">+</button>
+            <button onclick="deleteItem('${item.id}')" aria-label="Supprimer"
+              class="text-red-300 hover:text-red-500 transition-colors p-2 ml-1">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -241,7 +282,8 @@
 
     setInterval(refreshList, 30000);
   </script>
-  <p class="text-center text-xs text-gray-300 mt-8 pb-4">v<%= locals.version %></p>
+  <%- include('partials/install-banner') %>
+  <footer class="fixed bottom-0 left-0 right-0 pb-3 pt-6 text-center text-xs text-gray-300 pointer-events-none bg-gradient-to-t from-gray-50 to-transparent">v<%= locals.version %></footer>
   <script src="/js/app-version.js?v=<%= locals.version %>" defer></script>
 </body>
 </html>

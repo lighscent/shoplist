@@ -35,12 +35,12 @@
       </form>
     </div>
 
-    <p class="text-center text-sm text-gray-500 mt-6">
+    <p class="text-center text-sm text-gray-500 mt-6 pb-10">
       Déjà un compte ?
       <a href="/login" class="text-blue-500 font-medium hover:underline">Se connecter</a>
     </p>
-    <p class="text-center text-xs text-gray-300 mt-8">v<%= locals.version %></p>
   </div>
+  <footer class="fixed bottom-0 left-0 right-0 pb-3 pt-6 text-center text-xs text-gray-300 pointer-events-none bg-gradient-to-t from-gray-50 to-transparent">v<%= locals.version %></footer>
   <script src="/js/app-version.js?v=<%= locals.version %>" defer></script>
 </body>
 </html>

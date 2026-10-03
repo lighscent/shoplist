@@ -45,6 +45,14 @@ router.delete('/list/:id/items/:itemId', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+router.delete('/list/:id/checked', requireAuth, (req, res) => {
+  const list = store.getList(req.params.id);
+  if (!list) return res.status(404).json({ error: 'Liste introuvable' });
+  const removed = store.clearCheckedItems(req.params.id);
+  ws.broadcast(req.params.id);
+  res.json({ ok: true, removed });
+});
+
 router.delete('/list/:id', requireAuth, (req, res) => {
   const ok = store.deleteList(req.params.id, req.session.userEmail);
   if (!ok) return res.status(403).json({ error: 'Action non autorisee' });

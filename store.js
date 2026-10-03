@@ -40,6 +40,12 @@ function setPseudo(email, pseudo) {
   return { email, pseudo };
 }
 
+function updatePassword(email, newPassword) {
+  const hash = bcrypt.hashSync(newPassword, 10);
+  db.prepare('UPDATE users SET password = ? WHERE email = ?').run(hash, email);
+  return true;
+}
+
 function touchList(listId) {
   db.prepare('UPDATE lists SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(listId);
 }
@@ -54,11 +60,13 @@ function createList(name, createdBy) {
 
 function getListsByUser(email) {
   return db.prepare(`
-    SELECT DISTINCT l.id, l.name, l.updated_at, l.created_by,
-      (SELECT COUNT(*) FROM items WHERE list_id = l.id) AS item_count
+    SELECT l.id, l.name, l.updated_at, l.created_by,
+      (SELECT COUNT(*) FROM items WHERE list_id = l.id) AS item_count,
+      (SELECT COUNT(*) FROM items WHERE list_id = l.id AND checked = 1) AS checked_count
     FROM lists l
     LEFT JOIN list_members lm ON lm.list_id = l.id
     WHERE l.created_by = ? OR lm.user_email = ?
+    GROUP BY l.id
     ORDER BY l.updated_at DESC
   `).all(email, email);
 }
@@ -127,6 +135,12 @@ function removeItem(listId, itemId) {
   return result.changes > 0;
 }
 
+function clearCheckedItems(listId) {
+  const result = db.prepare('DELETE FROM items WHERE list_id = ? AND checked = 1').run(listId);
+  if (result.changes > 0) touchList(listId);
+  return result.changes;
+}
+
 function deleteList(listId, email) {
   const list = db.prepare('SELECT created_by FROM lists WHERE id = ?').get(listId);
   if (!list) return false;
@@ -175,4 +189,42 @@ function getRecentItems(email, limit = 15) {
   `).all(email, email, limit);
 }
 
-module.exports = { createList, getList, getListByShareToken, addItem, toggleItem, changeItemQuantity, removeItem, createUser, getUserByEmail, verifyUser, setPseudo, getListsByUser, deleteList, rotateShareToken, addMember, removeMember, getMembers, getRecentItems };
+function deleteUser(email) {
+  const owned = db.prepare('SELECT id FROM lists WHERE created_by = ?').all(email);
+  for (const l of owned) {
+    db.prepare('DELETE FROM items WHERE list_id = ?').run(l.id);
+    db.prepare('DELETE FROM list_members WHERE list_id = ?').run(l.id);
+    db.prepare('DELETE FROM lists WHERE id = ?').run(l.id);
+  }
+  db.prepare('DELETE FROM list_members WHERE user_email = ?').run(email);
+  db.prepare('DELETE FROM pseudo_changes WHERE user_email = ?').run(email);
+  db.prepare('DELETE FROM users WHERE email = ?').run(email);
+  try {
+    const rows = db.prepare('SELECT sid, data FROM sessions').all();
+    for (const r of rows) {
+      try { if (JSON.parse(r.data).userEmail === email) db.prepare('DELETE FROM sessions WHERE sid = ?').run(r.sid); } catch {}
+    }
+  } catch {}
+  return true;
+}
+
+const PSEUDO_MAX_PER_WEEK = 2;
+const PSEUDO_MIN_GAP_MIN = 15;
+
+function getPseudoChangeStatus(email) {
+  const row = db.prepare(
+    `SELECT COUNT(*) AS count7d, MIN(changed_at) AS oldest, MAX(changed_at) AS last,
+      (strftime('%s','now') - strftime('%s', MAX(changed_at))) / 60.0 AS minsSinceLast
+     FROM pseudo_changes WHERE user_email = ? AND changed_at > datetime('now', '-7 days')`
+  ).get(email);
+  const count7d = row ? row.count7d : 0;
+  const minsSinceLast = row && row.minsSinceLast != null ? row.minsSinceLast : null;
+  return { count7d, remaining: Math.max(0, PSEUDO_MAX_PER_WEEK - count7d), minsSinceLast, oldest: row ? row.oldest : null };
+}
+
+function recordPseudoChange(email) {
+  db.prepare('DELETE FROM pseudo_changes WHERE user_email = ? AND changed_at <= datetime(\'now\', \'-7 days\')').run(email);
+  db.prepare('INSERT INTO pseudo_changes (user_email) VALUES (?)').run(email);
+}
+
+module.exports = { createList, getList, getListByShareToken, addItem, toggleItem, changeItemQuantity, removeItem, createUser, getUserByEmail, verifyUser, setPseudo, getListsByUser, deleteList, rotateShareToken, addMember, removeMember, getMembers, getRecentItems, deleteUser, updatePassword, getPseudoChangeStatus, recordPseudoChange, clearCheckedItems, PSEUDO_MAX_PER_WEEK, PSEUDO_MIN_GAP_MIN };

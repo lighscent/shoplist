@@ -13,7 +13,18 @@ router.get('/', requireAuth, requirePseudo, (req, res) => {
 router.post('/lists', requireAuth, requirePseudo, (req, res) => {
   const { name } = req.body;
   if (!name || !name.trim()) return res.redirect('/');
-  const list = store.createList(name.trim(), req.session.userEmail);
+  const wantsJson = req.get('X-Requested-With') === 'XMLHttpRequest' || (req.get('Accept') || '').includes('application/json');
+  const trimmed = name.trim();
+  const duplicate = store.getListsByUser(req.session.userEmail)
+    .find((l) => l.created_by === req.session.userEmail && l.name.trim().toLowerCase() === trimmed.toLowerCase());
+  if (duplicate) {
+    if (wantsJson) return res.status(409).json({ error: 'duplicate', name: trimmed, existingId: duplicate.id });
+    const lists = store.getListsByUser(req.session.userEmail);
+    const recentItems = store.getRecentItems(req.session.userEmail);
+    return res.render('index', { lists, recentItems, warningName: trimmed, existingList: duplicate });
+  }
+  const list = store.createList(trimmed, req.session.userEmail);
+  if (wantsJson) return res.json({ id: list.id });
   res.redirect('/list/' + list.id);
 });
 

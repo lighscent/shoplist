@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Profil - ShopList</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="manifest" href="/manifest.json?v=<%= locals.version %>">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <meta name="theme-color" content="#3b82f6">
+</head>
+<body class="bg-gray-50 min-h-dvh">
+  <div class="max-w-sm mx-auto px-4 py-6 pb-10">
+    <div class="flex items-center gap-3 mb-6">
+      <a href="/" class="shrink-0 text-gray-400 hover:text-gray-600 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </a>
+      <h1 class="text-xl font-bold text-gray-800 truncate">Profil</h1>
+    </div>
+
+    <% if (locals.error) { %>
+      <p class="bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 mb-4 border border-red-200"><%= error %></p>
+    <% } %>
+    <% if (locals.success) { %>
+      <p class="bg-green-100 text-gray-800 text-sm rounded-xl px-4 py-3 mb-4"><%= success %></p>
+    <% } %>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
+      <p class="text-xs text-gray-400 mb-1">Email</p>
+      <p class="text-sm text-gray-800 font-medium truncate"><%= user.email %></p>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+      <p class="text-xs text-gray-400 mb-3">Pseudo</p>
+      <form id="pseudoForm" action="/profile/pseudo" method="POST" class="flex gap-2">
+        <input type="text" id="pseudoInput" name="pseudo" value="<%= user.pseudo %>" required minlength="2"
+          class="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        <button type="submit"
+          class="bg-blue-500 text-white font-medium px-4 rounded-xl text-sm hover:bg-blue-600 active:bg-blue-700 transition-colors shrink-0">
+          OK
+        </button>
+      </form>
+      <p id="pseudoMsg" class="text-xs mt-3 hidden"></p>
+      <p id="pseudoRemaining" class="text-xs text-gray-400 mt-3"><%= locals.pseudoStatus ? pseudoStatus.remaining : 2 %> changement(s) restant(s) sur 7 jours — 15 min minimum entre chaque</p>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+      <p class="text-xs text-gray-400 mb-3">Mot de passe</p>
+      <form id="passwordForm" action="/profile/password" method="POST" class="space-y-2">
+        <input type="password" name="currentPassword" placeholder="Mot de passe actuel" required
+          class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        <input type="password" name="newPassword" placeholder="Nouveau mot de passe" required minlength="4"
+          class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        <button type="submit"
+          class="w-full bg-blue-500 text-white font-medium py-2.5 rounded-xl text-sm hover:bg-blue-600 active:bg-blue-700 transition-colors">
+          Changer le mot de passe
+        </button>
+      </form>
+      <p id="passwordMsg" class="text-xs mt-3 hidden"></p>
+    </div>
+
+    <div class="pt-6 border-t border-gray-200 space-y-3">
+      <form action="/logout" method="POST">
+        <button type="submit"
+          class="w-full text-red-500 hover:text-red-700 text-sm font-medium py-2.5 rounded-xl border border-red-200 hover:border-red-300 transition-colors">
+          Se déconnecter
+        </button>
+      </form>
+      <button onclick="confirmDelete()"
+        class="w-full bg-red-500 text-white text-sm font-medium py-2.5 rounded-xl hover:bg-red-600 active:bg-red-700 transition-colors">
+        Supprimer mon compte
+      </button>
+    </div>
+  </div>
+
+  <div id="confirmOverlay" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-xs p-6">
+      <p id="confirmMsg" class="text-gray-800 text-sm font-medium text-center mb-5"></p>
+      <div class="flex gap-3">
+        <button id="confirmNo" class="flex-1 py-2.5 rounded-xl text-sm font-medium border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">Annuler</button>
+        <button id="confirmYes" class="flex-1 py-2.5 rounded-xl text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors">Confirmer</button>
+      </div>
+    </div>
+  </div>
+
+  <form id="deleteForm" action="/account/delete" method="POST" class="hidden"></form>
+
+  <script>
+    function showConfirm(msg) {
+      return new Promise(resolve => {
+        document.getElementById('confirmMsg').textContent = msg;
+        document.getElementById('confirmOverlay').classList.remove('hidden');
+        document.getElementById('confirmYes').onclick = () => { document.getElementById('confirmOverlay').classList.add('hidden'); resolve(true); };
+        document.getElementById('confirmNo').onclick = () => { document.getElementById('confirmOverlay').classList.add('hidden'); resolve(false); };
+      });
+    }
+
+    function flashMsg(el, text, ok) {
+      el.textContent = text;
+      el.classList.remove('hidden');
+      el.style.color = ok ? '#15803d' : '#dc2626';
+    }
+
+    async function postForm(form) {
+      const res = await fetch(form.action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+        body: new URLSearchParams(new FormData(form))
+      });
+      const data = await res.json().catch(() => ({}));
+      return { res, data };
+    }
+
+    document.getElementById('pseudoForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const msg = document.getElementById('pseudoMsg');
+      try {
+        const { res, data } = await postForm(this);
+        if (res.ok) {
+          document.getElementById('pseudoInput').value = data.pseudo;
+          document.getElementById('pseudoRemaining').textContent = data.remaining + ' changement(s) restant(s) sur 7 jours — 15 min minimum entre chaque';
+          flashMsg(msg, data.unchanged ? 'Pseudo inchangé' : 'Pseudo mis à jour', true);
+        } else {
+          flashMsg(msg, data.error || 'Erreur', false);
+        }
+      } catch { this.submit(); }
+    });
+
+    document.getElementById('passwordForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const msg = document.getElementById('passwordMsg');
+      try {
+        const { res, data } = await postForm(this);
+        if (res.ok) {
+          this.reset();
+          flashMsg(msg, 'Mot de passe mis à jour', true);
+        } else {
+          flashMsg(msg, data.error || 'Erreur', false);
+        }
+      } catch { this.submit(); }
+    });
+
+    async function confirmDelete() {
+      const ok = await showConfirm('Supprimer ton compte définitivement ? Tes listes seront supprimées.');
+      if (ok) document.getElementById('deleteForm').submit();
+    }
+  </script>
+  <footer class="fixed bottom-0 left-0 right-0 pb-3 pt-6 text-center text-xs text-gray-300 pointer-events-none bg-gradient-to-t from-gray-50 to-transparent">v<%= locals.version %></footer>
+  <script src="/js/app-version.js?v=<%= locals.version %>" defer></script>
+</body>
+</html>
