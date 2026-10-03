@@ -19,6 +19,11 @@ router.get('/list/:id', requireAuth, (req, res) => {
   res.json(list);
 });
 
+// Mes listes (pour le refresh temps réel de l'accueil)
+router.get('/lists', requireAuth, (req, res) => {
+  res.json(store.getListsByUser(req.session.userEmail));
+});
+
 router.post('/list/:id/items', requireAuth, requireCanEdit, (req, res) => {
   const { name, quantity, addedBy } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'Le nom est requis' });
@@ -62,8 +67,12 @@ router.delete('/list/:id/checked', requireAuth, requireCanEdit, (req, res) => {
 });
 
 router.delete('/list/:id', requireAuth, (req, res) => {
+  const list = store.getList(req.params.id);
+  const emails = list ? [list.created_by, ...store.getMembers(req.params.id).map((m) => m.email)] : [];
   const ok = store.deleteList(req.params.id, req.session.userEmail);
   if (!ok) return res.status(403).json({ error: 'Action non autorisee' });
+  ws.broadcast(req.params.id, { type: 'list-deleted' });
+  ws.notifyUsers(emails, { type: 'lists-changed', action: 'removed', id: req.params.id });
   res.json({ ok: true });
 });
 
@@ -83,6 +92,7 @@ router.delete('/list/:id/members/:email', requireAuth, requireCanEdit, (req, res
   const ok = store.removeMember(req.params.id, req.params.email);
   if (!ok) return res.status(403).json({ error: 'Action non autorisee' });
   ws.broadcast(req.params.id);
+  ws.notifyUsers([decodeURIComponent(req.params.email)], { type: 'lists-changed', action: 'removed', id: req.params.id });
   res.json({ ok: true });
 });
 

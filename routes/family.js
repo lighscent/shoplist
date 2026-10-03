@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const store = require('../store');
+const ws = require('../ws');
 const { baseUrl } = require('../lib/urls');
 const { requireAuth, requirePseudo } = require('../middleware/auth');
 
@@ -55,6 +56,7 @@ router.post('/famille/remove', requireAuth, requirePseudo, (req, res) => {
 // Quitter une famille dont on fait partie (on perd aussi l'accès à ses listes)
 router.post('/famille/leave', requireAuth, requirePseudo, (req, res) => {
   store.leaveFamily((req.body.owner || '').trim(), req.session.userEmail);
+  ws.notifyUsers([req.session.userEmail], { type: 'lists-changed', action: 'removed' });
   if (wantsJson(req)) return res.json({ ok: true });
   res.redirect('/famille');
 });

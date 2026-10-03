@@ -1,6 +1,6 @@
 {
   "name": "mylist",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Liste de courses collaborative temps reel",
   "main": "index.js",
   "scripts": {

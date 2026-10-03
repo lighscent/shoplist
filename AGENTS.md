@@ -12,7 +12,8 @@ Express 5 + EJS + SQLite (`better-sqlite3`) + `ws`. Mobile-first PWA (`max-w-sm`
 ## Wiring
 
 - `index.js` — entrypoint: dynamic `/api/version`, `/manifest.json`, `/sw.js` (all no-cache), static `public/`, session (SQLiteStore), `res.locals.user` + `res.locals.version`, then routers.
-- `routes/auth.js` (`/login`, `/register`, `/choose-pseudo`, `/profile`, `/account/delete`), `routes/lists.js` (`/`, `/lists`, `/join/:token`, `/list/:id`), `routes/family.js` (`/famille`, `/famille/add|remove|leave|rights|invite`, `/famille/rejoindre/:token`), `routes/api.js` (`/api/...`, dont `POST /list/:id/invite`, auth required except `/api/version`).
+- `routes/auth.js` (`/login`, `/register`, `/choose-pseudo`, `/profile`, `/account/delete`), `routes/lists.js` (`/`, `/lists`, `/join/:token`, `/list/:id`), `routes/family.js` (`/famille`, `/famille/add|remove|leave|rights|invite`, `/famille/rejoindre/:token`), `routes/api.js` (`/api/...`, dont `GET /api/lists` + `POST /list/:id/invite`, auth required except `/api/version`).
+- `ws.js` — rooms par liste (`join`/`leave`) + rooms par user (`join-user`, auth via cookie de session, jamais l'email client). `notifyUsers(emails, data)` pour les events hors liste (`lists-changed`). Heartbeat 30 s + reconnect client avec backoff (`list.ejs`, `index.ejs`).
 - Invites famille + listes : 30 min, usage unique, générées à la demande uniquement (`store.create*Invite` / `peek*` / `consume*`). `lib/urls.js` `baseUrl(req)` (`SITE_URL` env, sinon hôte de la requête, proxy-aware).
 - Droits : `can_edit` sur `family_members` + `list_members` (`store.canEditList`, créateur toujours éditeur). Toggle via `POST /famille/rights`, propagé aux listes du propriétaire. Mutations API → 403 si lecture seule.
 - `middleware/auth.js` — `requireAuth`, `requirePseudo` (no pseudo → `/choose-pseudo`).

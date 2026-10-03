@@ -43,19 +43,16 @@
       <a id="dupLink" href="<%= locals.existingList ? '/list/' + existingList.id : '#' %>" class="font-medium" style="text-decoration:underline;">Ouvrir la liste existante</a>
     </div>
 
-    <% if (lists.length === 0) { %>
-      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-6 text-center">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z" />
-        </svg>
-        <p class="text-gray-800 font-medium text-sm mb-1">Aucune liste pour le moment</p>
-        <p class="text-gray-400 text-xs">Utilise le champ ci-dessus pour commencer</p>
-      </div>
-    <% } %>
+    <div id="emptyLists" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-6 text-center<%= lists.length === 0 ? '' : ' hidden' %>">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z" />
+      </svg>
+      <p class="text-gray-800 font-medium text-sm mb-1">Aucune liste pour le moment</p>
+      <p class="text-gray-400 text-xs">Utilise le champ ci-dessus pour commencer</p>
+    </div>
 
-    <% if (lists.length > 0) { %>
-      <div class="mb-6">
-        <h2 class="text-base font-semibold text-gray-700 mb-3">Mes listes (<%= lists.length %>)</h2>
+    <div class="mb-6<%= lists.length === 0 ? ' hidden' : '' %>" id="listsSection">
+      <h2 class="text-base font-semibold text-gray-700 mb-3" id="listsTitle">Mes listes (<span id="listsCount"><%= lists.length %></span>)</h2>
         <% if (lists.length > 3) { %>
           <input type="text" id="listSearch" placeholder="Rechercher une liste..."
             class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
@@ -82,7 +79,6 @@
         </div>
         <p id="noListResult" style="display:none" class="text-center text-gray-400 py-6 text-sm">Aucune liste trouvée.</p>
       </div>
-    <% } %>
 
   </div>
   <%- include('partials/install-banner') %>
@@ -145,6 +141,59 @@
           document.getElementById('noListResult').style.display = shown === 0 ? '' : 'none';
         });
       }
+    })();
+    (function() {
+      function esc(s) {
+        var d = document.createElement('div');
+        d.textContent = s || '';
+        return d.innerHTML;
+      }
+      function cardHtml(l) {
+        var total = l.item_count || 0, done = l.checked_count || 0;
+        var pct = total > 0 ? Math.round(done / total * 100) : 0;
+        var ro = l.can_edit ? '' : '<span class="text-xs font-normal px-2 py-0.5 rounded-full" style="background:#f3f4f6;color:#6b7280;">Lecture seule</span>';
+        return '<a href="/list/' + l.id + '" data-name="' + esc((l.name || '').toLowerCase()) + '"'
+          + ' class="list-card flex items-center bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:border-blue-200 transition-colors">'
+          + '<div class="flex-1 min-w-0">'
+          + '<p class="font-medium text-gray-800 text-sm truncate">' + esc(l.name) + ' ' + ro + '</p>'
+          + '<p class="text-xs text-gray-400 mt-1">' + done + '/' + total + ' article(s) coché(s)</p>'
+          + '<div style="height:6px;background:#f3f4f6;border-radius:9999px;margin-top:6px;overflow:hidden;">'
+          + '<div style="height:100%;width:' + pct + '%;background:#3b82f6;border-radius:9999px;"></div>'
+          + '</div></div>'
+          + '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-300 shrink-0 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">'
+          + '<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg></a>';
+      }
+      function renderLists(lists) {
+        document.getElementById('listsCount').textContent = lists.length;
+        var sec = document.getElementById('listsSection');
+        var empty = document.getElementById('emptyLists');
+        if (!lists.length) {
+          sec.classList.add('hidden');
+          empty.classList.remove('hidden');
+          return;
+        }
+        empty.classList.add('hidden');
+        sec.classList.remove('hidden');
+        document.getElementById('listsContainer').innerHTML = lists.map(cardHtml).join('');
+        if (lists.length > 3 && !document.getElementById('listSearch')) { window.location.reload(); return; }
+        var search = document.getElementById('listSearch');
+        if (search) search.dispatchEvent(new Event('input'));
+      }
+      async function fetchLists() {
+        try {
+          const res = await fetch('/api/lists');
+          if (res.ok) renderLists(await res.json());
+        } catch {}
+      }
+      var retry = 0;
+      function connectHome() {
+        var w = new WebSocket((window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host);
+        w.onopen = () => { retry = 0; w.send(JSON.stringify({ action: 'join-user' })); };
+        w.onmessage = (e) => { try { if (JSON.parse(e.data).type === 'lists-changed') fetchLists(); } catch {} };
+        w.onclose = () => { retry++; setTimeout(connectHome, Math.min(1000 * Math.pow(2, retry), 15000)); };
+        w.onerror = () => { try { w.close(); } catch {} };
+      }
+      connectHome();
     })();
   </script>
   <footer class="fixed bottom-0 left-0 right-0 pb-3 pt-6 text-center text-xs text-gray-300 pointer-events-none bg-gradient-to-t from-gray-50 to-transparent">v<%= locals.version %></footer>

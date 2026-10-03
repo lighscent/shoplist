@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const store = require('../store');
+const ws = require('../ws');
 const { baseUrl } = require('../lib/urls');
 const { requireAuth, requirePseudo } = require('../middleware/auth');
 
@@ -25,6 +26,8 @@ router.post('/lists', requireAuth, requirePseudo, (req, res) => {
     return res.render('index', { lists, recentItems, warningName: trimmed, existingList: duplicate });
   }
   const list = store.createList(trimmed, req.session.userEmail);
+  // La liste apparaît en direct chez le créateur + les membres famille auto-ajoutés
+  ws.notifyUsers([req.session.userEmail, ...store.getFamilyMembers(req.session.userEmail).map((m) => m.email)], { type: 'lists-changed', action: 'added', id: list.id });
   if (wantsJson) return res.json({ id: list.id });
   res.redirect('/list/' + list.id);
 });
@@ -47,6 +50,7 @@ router.get('/join/:token', (req, res) => {
   }
   store.consumeListInvite(req.params.token);
   store.addMember(list.id, req.session.userEmail);
+  ws.notifyUsers([req.session.userEmail], { type: 'lists-changed', action: 'added', id: list.id });
   res.redirect('/list/' + list.id);
 });
 

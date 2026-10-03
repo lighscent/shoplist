@@ -143,9 +143,20 @@
     const CAN_EDIT = <%= canEdit ? 'true' : 'false' %>;
     const userPseudo = '<%= locals.user && user.pseudo ? user.pseudo.replace(/'/g, "\\'") : "" %>';
     const defaultName = userPseudo || 'Anonyme';
-    const ws = new WebSocket((window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host);
-    ws.onopen = () => ws.send(JSON.stringify({ action: 'join', listId }));
-    ws.onmessage = (e) => { try { const d = JSON.parse(e.data); if (d.type === 'update') refreshList(); if (d.type === 'item-added' && d.item && d.item.addedBy !== defaultName) { showToast(d.item.addedBy + ' a ajoute ' + d.item.name); refreshList(); } } catch {} };
+    let ws = null, wsRetry = 0;
+    function connectWs() {
+      ws = new WebSocket((window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host);
+      ws.onopen = () => { wsRetry = 0; ws.send(JSON.stringify({ action: 'join', listId })); refreshList(); };
+      ws.onmessage = (e) => { try {
+        const d = JSON.parse(e.data);
+        if (d.type === 'list-deleted') { window.location.href = '/'; return; }
+        if (d.type === 'update') refreshList();
+        if (d.type === 'item-added' && d.item && d.item.addedBy !== defaultName) { showToast(d.item.addedBy + ' a ajoute ' + d.item.name); refreshList(); }
+      } catch {} };
+      ws.onclose = () => { wsRetry++; setTimeout(connectWs, Math.min(1000 * Math.pow(2, wsRetry), 15000)); };
+      ws.onerror = () => { try { ws.close(); } catch {} };
+    }
+    connectWs();
     function fmtDate(iso) {
       const d = new Date(iso + 'Z');
       const pad = n => String(n).padStart(2, '0');
