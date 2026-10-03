@@ -20,12 +20,12 @@ npm run dev    # app + tailwind watch
 npm start      # prod
 ```
 
-App : http://localhost:3000 (`PORT` pour changer).
+App : http://localhost:3030 (`PORT` pour changer).
 
 ## Env
 
 ```bash
-PORT=3000
+PORT=3030
 SESSION_SECRET=change-me
 SITE_URL=https://mon-domaine.fr   # optionnel : base des liens d'invitation
 ```
