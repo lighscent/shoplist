@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Membres - <%= list.name %> - ShopList</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="manifest" href="/manifest.json?v=<%= locals.version %>">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <meta name="theme-color" content="#3b82f6">
+</head>
+<body class="bg-gray-50 min-h-dvh">
+  <div class="max-w-sm mx-auto px-4 py-6">
+    <div class="flex items-center gap-3 mb-6">
+      <a href="/list/<%= list.id %>" class="shrink-0 text-gray-400 hover:text-gray-600 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </a>
+      <h1 class="text-xl font-bold text-gray-800 truncate"><%= list.name %></h1>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+      <h2 class="text-sm font-semibold text-gray-700 mb-3">Partager la liste</h2>
+      <p class="text-xs text-gray-400 mb-3">Le lien expire apres la premiere utilisation.</p>
+      <button onclick="shareList()"
+        class="w-full bg-blue-500 text-white font-medium py-2.5 rounded-xl text-sm hover:bg-blue-600 active:bg-blue-700 transition-colors">
+        Copier le lien
+      </button>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <h2 class="text-sm font-semibold text-gray-700 mb-3">Membres (<%= members.length %>)</h2>
+      <div id="membersList" class="space-y-3">
+        <% members.forEach(m => { %>
+          <div class="flex items-center justify-between">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm text-gray-800 truncate"><%= m.pseudo || m.email %></p>
+              <p class="text-xs text-gray-400 truncate"><%= m.email %></p>
+            </div>
+            <% if (m.email === list.created_by) { %>
+              <span class="text-xs text-gray-400 shrink-0 ml-2">Proprietaire</span>
+            <% } else if (locals.user && list.created_by === user.email) { %>
+              <button onclick="removeMember('<%= m.email %>')" class="text-red-400 hover:text-red-600 text-sm font-medium shrink-0 ml-2">Retirer</button>
+            <% } %>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirmOverlay" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-xs p-6">
+      <p id="confirmMsg" class="text-gray-800 text-sm font-medium text-center mb-5"></p>
+      <div class="flex gap-3">
+        <button id="confirmNo" class="flex-1 py-2.5 rounded-xl text-sm font-medium border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">Annuler</button>
+        <button id="confirmYes" class="flex-1 py-2.5 rounded-xl text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors">Confirmer</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const listId = '<%= list.id %>';
+    const shareToken = '<%= list.share_token %>';
+    const listName = '<%= list.name.replace(/'/g, "\\'") %>';
+
+    function showConfirm(msg) {
+      return new Promise(resolve => {
+        document.getElementById('confirmMsg').textContent = msg;
+        document.getElementById('confirmOverlay').classList.remove('hidden');
+        document.getElementById('confirmYes').onclick = () => { document.getElementById('confirmOverlay').classList.add('hidden'); resolve(true); };
+        document.getElementById('confirmNo').onclick = () => { document.getElementById('confirmOverlay').classList.add('hidden'); resolve(false); };
+      });
+    }
+
+    function shareList() {
+      const url = window.location.origin + '/join/' + shareToken;
+      if (navigator.share) {
+        navigator.share({ title: 'ShopList', text: 'Rejoins ma liste de courses : ' + listName, url: url });
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(function() {
+          alert('Lien copie !');
+        });
+      } else {
+        prompt('Copie ce lien pour partager :', url);
+      }
+    }
+
+    async function removeMember(email) {
+      const ok = await showConfirm('Retirer ' + email + ' de cette liste ?');
+      if (!ok) return;
+      await fetch('/api/list/' + listId + '/members/' + encodeURIComponent(email), { method: 'DELETE' });
+      location.reload();
+    }
+  </script>
+  <p class="text-center text-xs text-gray-300 mt-8 pb-4">v<%= locals.version %></p>
+  <script src="/js/app-version.js?v=<%= locals.version %>" defer></script>
+</body>
+</html>

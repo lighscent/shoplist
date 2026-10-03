@@ -1,0 +1,21 @@
+{
+  "name": "ShopList",
+  "short_name": "ShopList",
+  "description": "Liste de courses collaborative",
+  "version": "1.1.0",
+  "id": "/",
+  "scope": "/",
+  "start_url": "/?v=1.1.0",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#f9fafb",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "name": "mylist",
+  "version": "1.1.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "concurrently \"nodemon index.js\" \"tailwindcss --input src/input.css --output public/css/main.css --watch\"",
+    "build:css": "tailwindcss --input src/input.css --output public/css/main.css",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.11.1",
+    "dotenv": "^17.4.2",
+    "ejs": "^6.0.1",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.2",
+    "concurrently": "^10.0.3",
+    "nodemon": "^3.1.14"
+  }
+}

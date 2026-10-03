@@ -1,0 +1,95 @@
+const Database = require('better-sqlite3');
+const path = require('path');
+const fs = require('fs');
+
+const dbDir = path.join(__dirname, 'db');
+if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+const db = new Database(path.join(dbDir, 'data.db'));
+db.pragma('journal_mode = WAL');
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    email TEXT PRIMARY KEY,
+    password TEXT NOT NULL,
+    pseudo TEXT DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS lists (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_by TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (created_by) REFERENCES users(email)
+  );
+
+  CREATE TABLE IF NOT EXISTS items (
+    id TEXT PRIMARY KEY,
+    list_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    quantity INTEGER DEFAULT 1,
+    checked INTEGER DEFAULT 0,
+    added_by TEXT DEFAULT 'Anonyme',
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
+  );
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sessions (
+    sid TEXT PRIMARY KEY,
+    expires TEXT,
+    data TEXT
+  )
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS list_members (
+    list_id TEXT NOT NULL,
+    user_email TEXT NOT NULL,
+    joined_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (list_id, user_email),
+    FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_email) REFERENCES users(email)
+  )
+`);
+
+try { db.exec("ALTER TABLE users ADD COLUMN pseudo TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE lists ADD COLUMN updated_at TEXT DEFAULT CURRENT_TIMESTAMP"); } catch {}
+try { db.exec("ALTER TABLE lists ADD COLUMN share_token TEXT"); } catch {}
+// backfill existing lists missing a share token
+const missing = db.prepare("SELECT id FROM lists WHERE share_token IS NULL").all();
+const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+for (const row of missing) {
+  let token = '';
+  for (let i = 0; i < 12; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
+  db.prepare('UPDATE lists SET share_token = ? WHERE id = ?').run(token, row.id);
+}
+
+const SessionStore = require('express-session').Store;
+
+class SQLiteStore extends SessionStore {
+  get(sid, cb) {
+    const row = db.prepare("SELECT data FROM sessions WHERE sid = ? AND (expires IS NULL OR expires > datetime('now'))").get(sid);
+    cb(null, row ? JSON.parse(row.data) : null);
+  }
+
+  set(sid, session, cb) {
+    const expires = session.cookie && session.cookie.expires ? new Date(session.cookie.expires).toISOString() : null;
+    db.prepare('INSERT OR REPLACE INTO sessions (sid, expires, data) VALUES (?, ?, ?)').run(sid, expires, JSON.stringify(session));
+    cb(null);
+  }
+
+  destroy(sid, cb) {
+    db.prepare('DELETE FROM sessions WHERE sid = ?').run(sid);
+    cb(null);
+  }
+
+  touch(sid, session, cb) {
+    const expires = session.cookie && session.cookie.expires ? new Date(session.cookie.expires).toISOString() : null;
+    db.prepare('UPDATE sessions SET expires = ? WHERE sid = ?').run(expires, sid);
+    cb(null);
+  }
+}
+
+module.exports = { db, SQLiteStore };

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Connexion - ShopList</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="manifest" href="/manifest.json?v=<%= locals.version %>">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <meta name="theme-color" content="#3b82f6">
+</head>
+<body class="bg-gray-50 min-h-dvh flex items-center">
+  <div class="w-full max-w-sm mx-auto px-4 py-8">
+    <div class="text-center mb-8">
+      <h1 class="text-4xl font-bold text-gray-800">ShopList</h1>
+      <p class="text-gray-400 mt-1">Connectez-vous à votre compte</p>
+    </div>
+
+    <% if (locals.error) { %>
+      <p class="bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 mb-4 border border-red-200"><%= error %></p>
+    <% } %>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <form action="/login" method="POST">
+        <input type="email" name="email" placeholder="Email" required
+          class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        <input type="password" name="password" placeholder="Mot de passe" required
+          class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        <button type="submit"
+          class="w-full bg-blue-500 text-white font-medium py-3 rounded-xl text-sm hover:bg-blue-600 active:bg-blue-700 transition-colors">
+          Se connecter
+        </button>
+      </form>
+    </div>
+
+    <p class="text-center text-sm text-gray-500 mt-6">
+      Pas encore de compte ?
+      <a href="/register" class="text-blue-500 font-medium hover:underline">Créer un compte</a>
+    </p>
+    <p class="text-center text-xs text-gray-300 mt-8">v<%= locals.version %></p>
+  </div>
+  <script src="/js/app-version.js?v=<%= locals.version %>" defer></script>
+</body>
+</html>
