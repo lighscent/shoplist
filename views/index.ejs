@@ -7,23 +7,18 @@
   <link rel="stylesheet" href="/css/main.css">
   <link rel="manifest" href="/manifest.json?v=<%= locals.version %>">
   <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="/icon.svg">
   <meta name="theme-color" content="#3b82f6">
 </head>
 <body class="bg-gray-50 min-h-dvh">
-  <div class="max-w-sm mx-auto px-4 py-6 pb-10">
+  <div class="max-w-sm mx-auto px-4 py-6" style="padding-bottom:110px;">
     <div class="flex items-center justify-between mb-6" style="position:sticky;top:0;z-index:30;background:#f9fafb;padding:12px 0;">
       <div class="min-w-0">
         <h1 class="text-2xl font-bold text-gray-800">ShopList</h1>
         <p class="text-gray-400 text-sm truncate max-w-48">Bonjour, <%= user.pseudo %></p>
       </div>
-      <a href="/profile" title="Profil" aria-label="Profil"
-        class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition-colors shrink-0">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      </a>
     </div>
 
     <form id="createForm" action="/lists" method="POST" class="flex gap-2 mb-6">
@@ -113,7 +108,7 @@
           });
           const data = await res.json().catch(() => ({}));
           if (res.ok && data.id) {
-            window.location.href = '/list/' + data.id;
+            if (window.goPage) window.goPage('/list/' + data.id); else window.location.href = '/list/' + data.id;
             return;
           }
           if (res.status === 409) {
@@ -183,20 +178,28 @@
         try {
           const res = await fetch('/api/lists');
           if (res.ok) renderLists(await res.json());
+          if (window.__spaForget) window.__spaForget('/');
         } catch {}
       }
-      var retry = 0;
+      var retry = 0, homeWs = null, homeDead = false, homeTimer = null;
+      window.__pageCleanup = window.__pageCleanup || [];
+      window.__pageCleanup.push(function() {
+        homeDead = true;
+        if (homeTimer) { clearTimeout(homeTimer); homeTimer = null; }
+        try { if (homeWs) { homeWs.onclose = function() {}; homeWs.close(); } } catch (e) {}
+      });
       function connectHome() {
         var w = new WebSocket((window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host);
+        homeWs = w;
         w.onopen = () => { retry = 0; w.send(JSON.stringify({ action: 'join-user' })); };
         w.onmessage = (e) => { try { if (JSON.parse(e.data).type === 'lists-changed') fetchLists(); } catch {} };
-        w.onclose = () => { retry++; setTimeout(connectHome, Math.min(1000 * Math.pow(2, retry), 15000)); };
+        w.onclose = () => { if (homeDead) return; retry++; homeTimer = setTimeout(connectHome, Math.min(1000 * Math.pow(2, retry), 15000)); };
         w.onerror = () => { try { w.close(); } catch {} };
       }
       connectHome();
     })();
   </script>
-  <footer class="fixed bottom-0 left-0 right-0 pb-3 pt-6 text-center text-xs text-gray-300 pointer-events-none bg-gradient-to-t from-gray-50 to-transparent">v<%= locals.version %></footer>
+  <%- include('partials/bottom-nav', {active: 'home'}) %>
   <script src="/js/app-version.js?v=<%= locals.version %>" defer></script>
 </body>
 </html>

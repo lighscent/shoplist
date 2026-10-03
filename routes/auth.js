@@ -62,6 +62,10 @@ router.get('/profile', requireAuth, (req, res) => {
   res.render('profile', { error: null, pseudoStatus });
 });
 
+router.get('/changelog', requireAuth, (req, res) => {
+  res.render('changelog', { entries: require('../changelog.json') });
+});
+
 router.post('/profile/pseudo', requireAuth, (req, res) => {
   const email = req.session.userEmail;
   const wantsJson = req.get('X-Requested-With') === 'XMLHttpRequest' || (req.get('Accept') || '').includes('application/json');

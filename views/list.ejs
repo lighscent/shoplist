@@ -7,12 +7,13 @@
   <link rel="stylesheet" href="/css/main.css">
   <link rel="manifest" href="/manifest.json?v=<%= locals.version %>">
   <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="/icon.svg">
   <meta name="theme-color" content="#3b82f6">
 </head>
 <body class="bg-gray-50 min-h-dvh">
-  <div class="max-w-sm mx-auto px-4 py-6 pb-10">
+  <div class="max-w-sm mx-auto px-4 py-6" style="padding-bottom:110px;">
     <div class="flex items-center gap-2 mb-4" style="position:sticky;top:0;z-index:30;background:#f9fafb;padding:12px 0;">
       <a href="/" aria-label="Retour" class="shrink-0 text-gray-400 hover:text-gray-600 transition-colors p-2">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -51,6 +52,7 @@
     </div>
 
     <% if (canEdit) { %>
+    <div style="position:relative;">
     <form id="addForm" class="flex gap-2 mb-6">
       <input type="number" name="quantity" min="1" value="1"
         class="px-3 bg-white border border-gray-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shrink-0" style="width:56px;height:48px;">
@@ -64,6 +66,8 @@
         </svg>
       </button>
     </form>
+    <div id="suggBox" class="hidden" style="position:absolute;top:100%;left:0;right:0;z-index:30;background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,.12);margin-top:2px;overflow:hidden;"></div>
+    </div>
     <% } %>
 
     <div id="itemsList" class="space-y-2">
@@ -139,21 +143,28 @@
   </div>
 
   <script>
-    const listId = '<%= list.id %>';
-    const CAN_EDIT = <%= canEdit ? 'true' : 'false' %>;
-    const userPseudo = '<%= locals.user && user.pseudo ? user.pseudo.replace(/'/g, "\\'") : "" %>';
-    const defaultName = userPseudo || 'Anonyme';
-    let ws = null, wsRetry = 0;
+    var listId = '<%= list.id %>';
+    var CAN_EDIT = <%= canEdit ? 'true' : 'false' %>;
+    var userPseudo = '<%= locals.user && user.pseudo ? user.pseudo.replace(/'/g, "\\'") : "" %>';
+    var defaultName = userPseudo || 'Anonyme';
+    var ws = null, wsRetry = 0, wsTimer = null, wsDead = false, refreshTimer = null;
+    window.__pageCleanup = window.__pageCleanup || [];
+    window.__pageCleanup.push(function() {
+      wsDead = true;
+      if (wsTimer) { clearTimeout(wsTimer); wsTimer = null; }
+      if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+      try { if (ws) { ws.onclose = function() {}; ws.close(); } } catch (e) {}
+    });
     function connectWs() {
       ws = new WebSocket((window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host);
       ws.onopen = () => { wsRetry = 0; ws.send(JSON.stringify({ action: 'join', listId })); refreshList(); };
       ws.onmessage = (e) => { try {
         const d = JSON.parse(e.data);
-        if (d.type === 'list-deleted') { window.location.href = '/'; return; }
+        if (d.type === 'list-deleted') { if (window.goPage) window.goPage('/'); else window.location.href = '/'; return; }
         if (d.type === 'update') refreshList();
         if (d.type === 'item-added' && d.item && d.item.addedBy !== defaultName) { showToast(d.item.addedBy + ' a ajoute ' + d.item.name); refreshList(); }
       } catch {} };
-      ws.onclose = () => { wsRetry++; setTimeout(connectWs, Math.min(1000 * Math.pow(2, wsRetry), 15000)); };
+      ws.onclose = () => { if (wsDead) return; wsRetry++; wsTimer = setTimeout(connectWs, Math.min(1000 * Math.pow(2, wsRetry), 15000)); };
       ws.onerror = () => { try { ws.close(); } catch {} };
     }
     connectWs();
@@ -163,7 +174,7 @@
       return pad(d.getDate()) + '/' + pad(d.getMonth()+1) + '/' + d.getFullYear() + ' à ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
     }
 
-    const addFormEl = document.getElementById('addForm');
+    var addFormEl = document.getElementById('addForm');
     if (addFormEl) addFormEl.addEventListener('submit', async function(e) {
       e.preventDefault();
       const name = this.querySelector('[name="name"]').value.trim();
@@ -177,8 +188,41 @@
 
       this.querySelector('[name="name"]').value = '';
       this.querySelector('[name="quantity"]').value = '1';
+      var sb = document.getElementById('suggBox');
+      if (sb) sb.classList.add('hidden');
       refreshList();
     });
+
+    // Autocomplete depuis le catalogue perso (min 2 lettres)
+    var suggInput = addFormEl ? addFormEl.querySelector('[name="name"]') : null;
+    var suggBox = document.getElementById('suggBox');
+    var suggTimer = null;
+    if (suggInput && suggBox) {
+      suggInput.setAttribute('autocomplete', 'off');
+      suggInput.addEventListener('input', function() {
+        if (suggTimer) clearTimeout(suggTimer);
+        var q = suggInput.value.trim();
+        if (q.length < 2) { suggBox.classList.add('hidden'); return; }
+        suggTimer = setTimeout(function() {
+          fetch('/api/catalog?q=' + encodeURIComponent(suggInput.value.trim()), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function(r) { return r.ok ? r.json() : []; })
+            .then(function(arr) {
+              if (!arr.length || document.activeElement !== suggInput) { suggBox.classList.add('hidden'); return; }
+              suggBox.innerHTML = '';
+              arr.forEach(function(a) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.style.cssText = 'display:flex;width:100%;align-items:center;gap:8px;padding:10px 12px;font-size:14px;color:#1f2937;background:#fff;border:0;border-bottom:1px solid #f3f4f6;text-align:left;';
+                b.textContent = a.name + (a.price != null ? ' — ' + a.price + ' €' : '');
+                b.addEventListener('mousedown', function(e) { e.preventDefault(); suggInput.value = a.name; suggBox.classList.add('hidden'); });
+                suggBox.appendChild(b);
+              });
+              suggBox.classList.remove('hidden');
+            }).catch(function() {});
+        }, 200);
+      });
+      suggInput.addEventListener('blur', function() { setTimeout(function() { suggBox.classList.add('hidden'); }, 150); });
+    }
 
     async function toggleItem(itemId) {
       await fetch('/api/list/' + listId + '/items/' + itemId + '/toggle', { method: 'POST' });
@@ -229,6 +273,7 @@
     }
 
     async function refreshList() {
+      if (window.__spaForget) window.__spaForget(window.location.pathname);
       const res = await fetch('/api/list/' + listId);
       const data = await res.json();
       renderItems(data.items);
@@ -301,13 +346,13 @@
       const ok = await showConfirm('Supprimer cette liste definitivement ?');
       if (!ok) return;
       await fetch('/api/list/' + listId, { method: 'DELETE' });
-      window.location.href = '/';
+      if (window.goPage) window.goPage('/'); else window.location.href = '/';
     }
 
-    setInterval(refreshList, 30000);
+    refreshTimer = setInterval(refreshList, 30000);
   </script>
   <%- include('partials/install-banner') %>
-  <footer class="fixed bottom-0 left-0 right-0 pb-3 pt-6 text-center text-xs text-gray-300 pointer-events-none bg-gradient-to-t from-gray-50 to-transparent">v<%= locals.version %></footer>
+  <%- include('partials/bottom-nav', {active: 'home'}) %>
   <script src="/js/app-version.js?v=<%= locals.version %>" defer></script>
 </body>
 </html>

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Mes articles - ShopList</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="manifest" href="/manifest.json?v=<%= locals.version %>">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <meta name="theme-color" content="#3b82f6">
+</head>
+<body class="bg-gray-50 min-h-dvh">
+  <div class="max-w-sm mx-auto px-4 py-6" style="padding-bottom:110px;">
+    <div class="flex items-center gap-3 mb-6">
+      <a href="/" class="shrink-0 text-gray-400 hover:text-gray-600 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </a>
+      <h1 class="text-xl font-bold text-gray-800 truncate">Mes articles (<span id="artCount"><%= items.length %></span>)</h1>
+    </div>
+
+    <p class="text-xs text-gray-400 mb-4">Ajoute tes articles avec leur prix. Les modifications sont enregistrées automatiquement, corbeille pour supprimer.</p>
+
+    <form id="addArtForm" action="/articles/add" method="POST" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 mb-4">
+      <div class="flex gap-2">
+        <input type="text" id="addArtName" name="name" placeholder="Nom de l'article" required maxlength="60"
+          class="flex-1 min-w-0 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        <div class="shrink-0" style="position:relative;width:6rem;">
+          <input type="number" id="addArtPrice" name="price" placeholder="Prix" min="0" step="0.01" inputmode="decimal"
+            class="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" style="width:100%;padding-right:20px;">
+          <span style="position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:12px;color:#9ca3af;pointer-events:none;">€</span>
+        </div>
+        <button type="submit"
+          class="bg-blue-500 text-white font-medium px-4 rounded-xl text-sm hover:bg-blue-600 active:bg-blue-700 transition-colors shrink-0">
+          Ajouter
+        </button>
+      </div>
+      <p id="addArtMsg" class="text-xs mt-2 hidden"></p>
+    </form>
+
+    <div id="artRows" class="space-y-2">
+      <% items.forEach(function(a) { %>
+        <form action="/articles/update" method="POST" class="artForm bg-white rounded-2xl shadow-sm border border-gray-100 p-3">
+          <input type="hidden" name="name" value="<%= a.name %>">
+          <div class="flex gap-2 items-center">
+            <input type="text" name="newName" value="<%= a.name %>" required maxlength="60"
+              class="flex-1 min-w-0 px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <div class="shrink-0" style="position:relative;width:5rem;">
+              <input type="number" name="price" placeholder="0.00" min="0" step="0.01" inputmode="decimal" value="<%= a.price != null ? a.price : '' %>"
+                class="px-2 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" style="width:100%;padding-right:20px;">
+              <span style="position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:12px;color:#9ca3af;pointer-events:none;">€</span>
+            </div>
+            <button type="button" data-name="<%= a.name %>" title="Ajouter à une liste"
+              class="toListBtn bg-gray-100 text-gray-600 font-bold px-3 py-2.5 rounded-xl text-base hover:bg-gray-200 active:bg-gray-300 transition-colors shrink-0">
+              +
+            </button>
+            <button type="button" title="Supprimer"
+              class="delArtBtn text-red-500 hover:text-red-700 font-medium px-1 shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </button>
+          </div>
+          <p class="artMsg text-xs mt-2 hidden"></p>
+        </form>
+      <% }); %>
+    </div>
+    <p id="artEmpty" class="text-center text-sm text-gray-400 mt-6 <%= items.length ? 'hidden' : '' %>">Aucun article pour l'instant — ajoute-les ci-dessus.</p>
+  </div>
+
+  <script>
+    var NAME_CLS = 'flex-1 min-w-0 px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
+    var PRICE_CLS = 'px-2 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
+    var PLUS_CLS = 'toListBtn bg-gray-100 text-gray-600 font-bold px-3 py-2.5 rounded-xl text-base hover:bg-gray-200 active:bg-gray-300 transition-colors shrink-0';
+    var TRASH_SVG = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>';
+
+    function delBtn() {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.title = 'Supprimer';
+      b.className = 'delArtBtn text-red-500 hover:text-red-700 font-medium px-2 shrink-0';
+      b.innerHTML = TRASH_SVG;
+      b.addEventListener('click', onDelClick);
+      return b;
+    }
+
+    function artRow(name, price) {
+      var f = document.createElement('form');
+      f.action = '/articles/update';
+      f.method = 'POST';
+      f.className = 'artForm bg-white rounded-2xl shadow-sm border border-gray-100 p-3';
+      var hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.name = 'name';
+      hidden.value = name;
+      var line = document.createElement('div');
+      line.className = 'flex gap-2 items-center';
+      var nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.name = 'newName';
+      nameInput.value = name;
+      nameInput.required = true;
+      nameInput.maxLength = 60;
+      nameInput.className = NAME_CLS;
+      nameInput.addEventListener('change', onArtChange);
+      line.appendChild(nameInput);
+      var wrap = document.createElement('div');
+      wrap.className = 'shrink-0';
+      wrap.style.cssText = 'position:relative;width:5rem;';
+      var input = document.createElement('input');
+      input.type = 'number';
+      input.name = 'price';
+      input.placeholder = '0.00';
+      input.min = '0';
+      input.step = '0.01';
+      input.setAttribute('inputmode', 'decimal');
+      if (price != null) input.value = price;
+      input.className = PRICE_CLS;
+      input.style.cssText = 'width:100%;padding-right:20px;';
+      input.addEventListener('change', onArtChange);
+      var euro = document.createElement('span');
+      euro.textContent = '€';
+      euro.style.cssText = 'position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:12px;color:#9ca3af;pointer-events:none;';
+      wrap.appendChild(input);
+      wrap.appendChild(euro);
+      line.appendChild(wrap);
+      var plus = document.createElement('button');
+      plus.type = 'button';
+      plus.className = PLUS_CLS;
+      plus.title = 'Ajouter à une liste';
+      plus.textContent = '+';
+      plus.setAttribute('data-name', name);
+      plus.addEventListener('click', onToListClick);
+      line.appendChild(plus);
+      line.appendChild(delBtn());
+      var msg = document.createElement('p');
+      msg.className = 'artMsg text-xs mt-2 hidden';
+      f.appendChild(hidden);
+      f.appendChild(line);
+      f.appendChild(msg);
+      f.addEventListener('submit', onArtSubmit);
+      return f;
+    }
+
+    function showArtMsg(f, text) {
+      var msg = f.querySelector('.artMsg');
+      if (!msg) return;
+      msg.textContent = text;
+      msg.classList.remove('hidden');
+      msg.style.color = '#dc2626';
+    }
+
+    async function saveArtForm(f) {
+      try {
+        var res = await fetch(f.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+          body: new URLSearchParams(new FormData(f))
+        });
+        var data = await res.json().catch(function() { return {}; });
+        if (res.ok) {
+          var newName = f.querySelector('input[name="newName"]').value.trim();
+          f.querySelector('input[name="name"]').value = newName;
+          var plus = f.querySelector('.toListBtn');
+          if (plus) plus.setAttribute('data-name', newName);
+          var msg = f.querySelector('.artMsg');
+          if (msg) {
+            msg.textContent = 'Enregistré ✓';
+            msg.classList.remove('hidden');
+            msg.style.color = '#15803d';
+            setTimeout(function() { msg.classList.add('hidden'); }, 1200);
+          }
+        } else if (data && data.error) {
+          showArtMsg(f, data.error);
+        } else {
+          f.submit();
+        }
+      } catch (err) { f.submit(); }
+    }
+    async function onArtSubmit(e) {
+      e.preventDefault();
+      saveArtForm(e.currentTarget);
+    }
+    function onArtChange(e) {
+      saveArtForm(e.currentTarget.closest('form'));
+    }
+    document.querySelectorAll('.artForm').forEach(function(f) {
+      f.addEventListener('submit', onArtSubmit);
+      f.querySelectorAll('input[type="text"], input[type="number"]').forEach(function(i) {
+        i.addEventListener('change', onArtChange);
+      });
+    });
+    document.querySelectorAll('.delArtBtn').forEach(function(b) {
+      b.addEventListener('click', onDelClick);
+    });
+
+    async function onDelClick(e) {
+      var btn = e.currentTarget;
+      var ok = window.confirmPopup
+        ? await window.confirmPopup('Supprimer cet article ?')
+        : window.confirm('Supprimer cet article ?');
+      if (!ok) return;
+      var f = btn.closest('form');
+      var oldname = f.querySelector('input[name="name"]').value;
+      try {
+        var res = await fetch('/articles/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+          body: new URLSearchParams({ name: oldname })
+        });
+        if (res.ok) {
+          f.remove();
+          var rows = document.getElementById('artRows');
+          document.getElementById('artCount').textContent = rows.querySelectorAll('form').length;
+          if (!rows.querySelectorAll('form').length) document.getElementById('artEmpty').classList.remove('hidden');
+        }
+      } catch (err) {}
+    }
+
+    document.getElementById('addArtForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      var msg = document.getElementById('addArtMsg');
+      var nameInput = document.getElementById('addArtName');
+      var priceInput = document.getElementById('addArtPrice');
+      try {
+        var res = await fetch(this.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+          body: new URLSearchParams(new FormData(this))
+        });
+        var data = await res.json().catch(function() { return {}; });
+        if (res.ok && data.item) {
+          var rows = document.getElementById('artRows');
+          var existing = rows.querySelector('input[type="hidden"][value="' + data.item.name.replace(/"/g, '') + '"]');
+          if (existing && !data.item.isNew) {
+            existing.closest('form').querySelector('input[name="price"]').value = data.item.price != null ? data.item.price : '';
+          } else if (!existing) {
+            rows.prepend(artRow(data.item.name, data.item.price));
+          }
+          document.getElementById('artEmpty').classList.add('hidden');
+          document.getElementById('artCount').textContent = rows.querySelectorAll('form').length;
+          nameInput.value = '';
+          priceInput.value = '';
+          msg.classList.add('hidden');
+        } else {
+          msg.textContent = (data && data.error) || 'Erreur';
+          msg.classList.remove('hidden');
+          msg.style.color = '#dc2626';
+        }
+      } catch (err) { this.submit(); }
+    });
+  </script>
+  <div id="listPicker" class="hidden" style="position:fixed;inset:0;z-index:60;">
+    <div id="listPickerBg" style="position:absolute;inset:0;background:rgba(0,0,0,.4);"></div>
+    <div style="position:absolute;left:16px;right:16px;bottom:120px;max-width:24rem;margin:0 auto;background:#fff;border-radius:16px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.2);">
+      <p id="listPickerTitle" class="text-sm font-medium text-gray-800 mb-2">Ajouter à…</p>
+      <div id="listPickerRows" style="display:flex;flex-direction:column;gap:4px;max-height:40vh;overflow-y:auto;"></div>
+    </div>
+  </div>
+  <script>
+    var myLists = <%- JSON.stringify(lists.map(function(l) { return { id: l.id, name: l.name }; })).replace(/</g, '\\u003c') %>;
+    var myPseudo = '<%= user && user.pseudo ? user.pseudo.replace(/\'/g, "\\\'") : "" %>';
+    var pickerName = null;
+    function closePicker() { document.getElementById('listPicker').classList.add('hidden'); }
+    document.getElementById('listPickerBg').addEventListener('click', closePicker);
+    function openPicker(name) {
+      pickerName = name;
+      document.getElementById('listPickerTitle').textContent = 'Ajouter « ' + name + ' » à…';
+      var rows = document.getElementById('listPickerRows');
+      rows.innerHTML = '';
+      if (!myLists.length) {
+        var p = document.createElement('p');
+        p.className = 'text-xs text-gray-400 text-center py-2';
+        p.textContent = 'Aucune liste — crée-en une depuis l\u2019accueil.';
+        rows.appendChild(p);
+      }
+      myLists.forEach(function(l) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.style.cssText = 'padding:10px 12px;font-size:14px;color:#1f2937;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;text-align:left;';
+        b.textContent = l.name;
+        b.addEventListener('click', function() { sendToList(l.id, b); });
+        rows.appendChild(b);
+      });
+      document.getElementById('listPicker').classList.remove('hidden');
+    }
+    async function sendToList(id, btn) {
+      try {
+        var res = await fetch('/api/list/' + id + '/items', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: pickerName, quantity: 1, addedBy: myPseudo || 'Anonyme' })
+        });
+        if (res.ok) {
+          btn.textContent = 'Ajouté ✓';
+          setTimeout(closePicker, 600);
+        }
+      } catch (err) {}
+    }
+    function onToListClick(e) { openPicker(e.currentTarget.getAttribute('data-name')); }
+    document.querySelectorAll('.toListBtn').forEach(function(b) { b.addEventListener('click', onToListClick); });
+  </script>
+  <%- include('partials/bottom-nav', {active: 'articles'}) %>
+  <script src="/js/app-version.js?v=<%= locals.version %>" defer></script>
+</body>
+</html>

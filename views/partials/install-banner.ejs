@@ -35,7 +35,8 @@
     return 'Menu \u22EE du navigateur > « Installer ShopList\u2026 » (ou icône d\u2019installation dans la barre d\u2019adresse)';
   }
   window.addEventListener('beforeinstallprompt', function(e) {
-    e.preventDefault();
+    // Pas de preventDefault : on laisse Chrome afficher son UI native,
+    // on garde l'événement pour notre bouton Installer.
     deferredPrompt = e;
     steps.classList.add('hidden');
     installBtn.textContent = 'Installer';

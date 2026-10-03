@@ -1,0 +1,67 @@
+[
+  {
+    "version": "1.7.0",
+    "date": "03/10/2026",
+    "items": [
+      "Mes articles : catalogue personnel avec prix, saisie auto et envoi direct dans une liste",
+      "Barre de navigation en bas (Accueil, Articles, Famille, Compte)",
+      "Changement de page sans rechargement, avec cache pour aller plus vite"
+    ]
+  },
+  {
+    "version": "1.6.0",
+    "date": "03/10/2026",
+    "items": [
+      "Les listes se mettent à jour en direct quand quelqu'un modifie un article",
+      "L'accueil reçoit les nouvelles listes sans rechargement",
+      "Reconnexion automatique si la connexion coupe"
+    ]
+  },
+  {
+    "version": "1.5.0",
+    "date": "03/10/2026",
+    "items": [
+      "Famille : chaque membre est Éditeur ou Lecteur (touche la pastille pour changer)",
+      "Les lecteurs voient les listes en lecture seule"
+    ]
+  },
+  {
+    "version": "1.4.0",
+    "date": "03/10/2026",
+    "items": [
+      "Liens d'invitation famille et listes : valables 30 minutes, usage unique",
+      "Les liens contiennent l'adresse complète du site"
+    ]
+  },
+  {
+    "version": "1.3.0",
+    "date": "03/10/2026",
+    "items": [
+      "Système de famille : les membres sont ajoutés automatiquement aux nouvelles listes",
+      "Possibilité de quitter une famille depuis la page Famille"
+    ]
+  },
+  {
+    "version": "1.2.0",
+    "date": "03/10/2026",
+    "items": [
+      "Page Compte : email, pseudo, changement de mot de passe, suppression de compte",
+      "Pseudo modifiable 2 fois tous les 7 jours"
+    ]
+  },
+  {
+    "version": "1.1.0",
+    "date": "03/10/2026",
+    "items": [
+      "L'application installée se met à jour toute seule",
+      "Numéro de version affiché en bas des pages"
+    ]
+  },
+  {
+    "version": "1.0.0",
+    "date": "03/10/2026",
+    "items": [
+      "Lancement : listes de courses partagées, comptes, application installable"
+    ]
+  }
+]

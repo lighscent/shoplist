@@ -63,6 +63,24 @@ db.exec(`
 `);
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS article_info (
+    user_email TEXT NOT NULL,
+    name TEXT NOT NULL,
+    display TEXT NOT NULL,
+    price REAL,
+    store TEXT,
+    manual INTEGER DEFAULT 1,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_email, name)
+  )
+`);
+// Catalogue 100% manuel : les lignes auto-alimentées (anciens backfill / ajouts en liste, manual=0)
+// sont purgées une fois pour toutes. Les écritures futures posent toujours manual=1.
+try { db.exec("ALTER TABLE article_info ADD COLUMN manual INTEGER"); } catch {}
+try { db.exec("UPDATE article_info SET manual = 1 WHERE price IS NOT NULL"); } catch {}
+try { db.exec("DELETE FROM article_info WHERE COALESCE(manual, 0) = 0"); } catch {}
+
+db.exec(`
   CREATE TABLE IF NOT EXISTS family_members (
     owner_email TEXT NOT NULL,
     member_email TEXT NOT NULL,

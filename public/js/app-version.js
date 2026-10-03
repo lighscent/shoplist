@@ -1,4 +1,6 @@
 (() => {
+  if (window.__appVersionInit) return;
+  window.__appVersionInit = true;
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }

@@ -24,6 +24,11 @@ router.get('/lists', requireAuth, (req, res) => {
   res.json(store.getListsByUser(req.session.userEmail));
 });
 
+// Recherche dans mon catalogue d'articles (autocomplete, min 2 lettres)
+router.get('/catalog', requireAuth, (req, res) => {
+  res.json(store.searchCatalog(req.session.userEmail, req.query.q || ''));
+});
+
 router.post('/list/:id/items', requireAuth, requireCanEdit, (req, res) => {
   const { name, quantity, addedBy } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'Le nom est requis' });

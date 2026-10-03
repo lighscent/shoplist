@@ -49,6 +49,7 @@ function deleteUser(email) {
     run('DELETE FROM lists WHERE id = ?', l.id);
   }
   run('DELETE FROM list_members WHERE user_email = ?', email);
+  run('DELETE FROM article_info WHERE user_email = ?', email);
   run('DELETE FROM pseudo_changes WHERE user_email = ?', email);
   run('DELETE FROM family_members WHERE owner_email = ? OR member_email = ?', email, email);
   run('DELETE FROM family_invites WHERE owner_email = ?', email);
@@ -229,6 +230,53 @@ function getRecentItems(email, limit = 15) {
   return all(`SELECT i.id, i.name, i.quantity, i.added_by, i.created_at, l.name AS list_name, l.id AS list_id FROM items i JOIN lists l ON l.id = i.list_id LEFT JOIN list_members lm ON lm.list_id = l.id WHERE l.created_by = ? OR lm.user_email = ? ORDER BY i.created_at DESC LIMIT ?`, email, email, limit);
 }
 
+// ---- catalogue articles (100% manuel ; rien n'est alimenté depuis les listes) ----
+function getCatalog(email) {
+  return all(`SELECT display AS name, price FROM article_info WHERE user_email = ? ORDER BY updated_at DESC`, email);
+}
+function searchCatalog(email, q) {
+  const query = (q || '').trim().toLowerCase();
+  if (query.length < 2) return [];
+  const esc = query.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+  return all(`SELECT display AS name, price FROM article_info WHERE user_email = ? AND name LIKE '%' || ? || '%' ESCAPE '\\' ORDER BY updated_at DESC LIMIT 8`, email, esc);
+}
+function parsePrice(price) {
+  const p = price === '' || price == null ? null : Number(price);
+  return (p != null && (!isFinite(p) || p < 0)) ? undefined : p;
+}
+// Ajout manuel : false si invalide, sinon { name, price, isNew }
+function addArticle(email, rawName, price) {
+  const display = (rawName || '').trim();
+  if (!display) return false;
+  const p = parsePrice(price);
+  if (p === undefined) return false;
+  const key = display.toLowerCase();
+  const existed = !!get('SELECT 1 AS ok FROM article_info WHERE user_email = ? AND name = ?', email, key);
+  run(`INSERT INTO article_info (user_email, name, display, price, manual, updated_at) VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP) ON CONFLICT(user_email, name) DO UPDATE SET price = excluded.price, manual = 1, updated_at = CURRENT_TIMESTAMP`, email, key, display, p);
+  return { name: display, price: p, isNew: !existed };
+}
+function setArticleInfo(email, rawName, price) {
+  const display = (rawName || '').trim();
+  if (!display) return false;
+  const p = parsePrice(price);
+  if (p === undefined) return false;
+  run('UPDATE article_info SET price = ?, manual = 1, updated_at = CURRENT_TIMESTAMP WHERE user_email = ? AND name = ?', p, email, display.toLowerCase());
+  return true;
+}
+// Renomme : 'empty' | 'exists' | { name } (nouvel affichage)
+function renameArticle(email, oldRaw, newRaw) {
+  const oldKey = (oldRaw || '').trim().toLowerCase();
+  const display = (newRaw || '').trim();
+  if (!oldKey || !display) return 'empty';
+  const newKey = display.toLowerCase();
+  if (newKey !== oldKey && get('SELECT 1 AS ok FROM article_info WHERE user_email = ? AND name = ?', email, newKey)) return 'exists';
+  run('UPDATE article_info SET name = ?, display = ?, manual = 1, updated_at = CURRENT_TIMESTAMP WHERE user_email = ? AND name = ?', newKey, display, email, oldKey);
+  return { name: display };
+}
+function deleteArticle(email, rawName) {
+  return run('DELETE FROM article_info WHERE user_email = ? AND name = ?', email, (rawName || '').trim().toLowerCase()).changes > 0;
+}
+
 // ---- family ----
 function getFamilyMembers(ownerEmail) {
   return all(`SELECT u.email, u.pseudo, COALESCE(fm.can_edit, 1) AS canEdit FROM family_members fm JOIN users u ON u.email = fm.member_email WHERE fm.owner_email = ? ORDER BY fm.added_at ASC`, ownerEmail);
@@ -297,4 +345,4 @@ function hasFamilyInvite(token) {
   return !!get('SELECT 1 AS ok FROM family_invites WHERE token = ?', token);
 }
 
-module.exports = { createList, getList, getListByShareToken, addItem, toggleItem, changeItemQuantity, removeItem, createUser, getUserByEmail, verifyUser, setPseudo, getListsByUser, deleteList, addMember, removeMember, getMembers, getRecentItems, deleteUser, updatePassword, getPseudoChangeStatus, recordPseudoChange, clearCheckedItems, isListMember, canEditList, createListInvite, getValidListInvite, peekListInvite, consumeListInvite, getFamilyMembers, addFamilyMember, removeFamilyMember, setFamilyCanEdit, getFamiliesOf, leaveFamily, createFamilyInvite, getValidFamilyInvite, peekFamilyInvite, consumeFamilyInvite, hasFamilyInvite, PSEUDO_MAX_PER_WEEK, PSEUDO_MIN_GAP_MIN };
+module.exports = { createList, getList, getListByShareToken, addItem, toggleItem, changeItemQuantity, removeItem, createUser, getUserByEmail, verifyUser, setPseudo, getListsByUser, deleteList, addMember, removeMember, getMembers, getRecentItems, getCatalog, searchCatalog, addArticle, setArticleInfo, renameArticle, deleteArticle, deleteUser, updatePassword, getPseudoChangeStatus, recordPseudoChange, clearCheckedItems, isListMember, canEditList, createListInvite, getValidListInvite, peekListInvite, consumeListInvite, getFamilyMembers, addFamilyMember, removeFamilyMember, setFamilyCanEdit, getFamiliesOf, leaveFamily, createFamilyInvite, getValidFamilyInvite, peekFamilyInvite, consumeFamilyInvite, hasFamilyInvite, PSEUDO_MAX_PER_WEEK, PSEUDO_MIN_GAP_MIN };
