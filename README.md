@@ -8,9 +8,10 @@ Crée tes listes, partage-les avec un lien, ajoute ta famille une fois pour tout
 
 - **Listes partagées** — lien d'invitation (valide 30 min, usage unique), chaque membre voit les mêmes items en temps réel.
 - **Temps réel** — ajouts, coches et suppressions diffusés en WebSocket, avec reconnexion automatique.
-- **Famille** — ajoute des proches par email ou lien ; ils rejoignent automatiquement tes nouvelles listes. Droits par membre : **Éditeur** ou **Lecteur**.
+- **Famille** — ajoute des proches par email ou lien ; ils rejoignent automatiquement tes nouvelles listes. Droits par membre : **Éditeur** ou **Lecteur**. On peut faire partie de plusieurs familles et les quitter depuis `/famille`.
+- **Mes articles** — catalogue perso (nom + prix) rempli à la main, avec autocomplétion dans les listes et envoi direct vers une liste.
 - **Comptes** — inscription, pseudo (modifiable avec limites anti-abus), changement de mot de passe, suppression de compte.
-- **PWA installable** — bannière d'installation, mises à jour automatiques via le numéro de version.
+- **PWA installable** — bannière d'installation, navigation sans rechargement, mises à jour automatiques via le numéro de version (visible sur `/profile`, historique sur `/changelog`).
 
 ## Lancer
 
@@ -33,4 +34,4 @@ SITE_URL=https://mon-domaine.fr   # optionnel : base des liens d'invitation
 ## Notes
 
 - DB SQLite locale : `db/data.db` (créée au démarrage, migrations non-destructives — ne pas supprimer ce dossier au déploiement).
-- Version : source unique `package.json` → exposée sur `/api/version`, manifest, SW et footer. Bumper `package.json` suffit à forcer la MaJ des applis installées.
+- Version : source unique `package.json` → exposée sur `/api/version`, manifest, SW et page `/profile`. Bumper `package.json` suffit à forcer la MaJ des applis installées. Historique des nouveautés dans `changelog.json` (page `/changelog`).
